@@ -14,46 +14,49 @@
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "d3dcompiler.lib")
 
-// Глобальные переменные
+// Р’РєР»СЋС‡Р°РµРј Р·Р°РіРѕР»РѕРІРѕС‡РЅС‹Р№ С„Р°Р№Р» РґР»СЏ СЂР°Р±РѕС‚С‹ СЃ DDS
+#include "DDS.h"
+
+// Р“Р»РѕР±Р°Р»СЊРЅС‹Рµ РїРµСЂРµРјРµРЅРЅС‹Рµ
 HWND g_hWnd = NULL;
 ID3D11Device* m_pDevice = nullptr;
 ID3D11DeviceContext* m_pDeviceContext = nullptr;
 IDXGISwapChain* m_pSwapChain = nullptr;
 ID3D11RenderTargetView* m_pBackBufferRTV = nullptr;
 
-// === ПЕРЕМЕННЫЕ ДЛЯ КУБИКА ===
+// === РџР•Р Р•РњР•РќРќР«Р• Р”Р›РЇ РљРЈР‘РРљРђ ===
 ID3D11Buffer* m_pVertexBuffer = nullptr;
 ID3D11Buffer* m_pIndexBuffer = nullptr;
 ID3D11VertexShader* m_pVertexShader = nullptr;
 ID3D11PixelShader* m_pPixelShader = nullptr;
 ID3D11InputLayout* m_pInputLayout = nullptr;
 
-// === НОВЫЕ ПЕРЕМЕННЫЕ ДЛЯ МАТРИЦ И УПРАВЛЕНИЯ ===
-ID3D11Buffer* m_pGeomBuffer = nullptr;        // Для первого куба
-ID3D11Buffer* m_pGeomBuffer2 = nullptr;       // Для второго куба
+// === РќРћР’Р«Р• РџР•Р Р•РњР•РќРќР«Р• Р”Р›РЇ РњРђРўР РР¦ Р РЈРџР РђР’Р›Р•РќРРЇ ===
+ID3D11Buffer* m_pGeomBuffer = nullptr;        // Р”Р»СЏ РїРµСЂРІРѕРіРѕ РєСѓР±Р°
+ID3D11Buffer* m_pGeomBuffer2 = nullptr;       // Р”Р»СЏ РІС‚РѕСЂРѕРіРѕ РєСѓР±Р°
 ID3D11Buffer* m_pSceneBuffer = nullptr;
 
-// === ПЕРЕМЕННЫЕ ДЛЯ БУФЕРА ГЛУБИНЫ (D32_FLOAT) ===
+// === РџР•Р Р•РњР•РќРќР«Р• Р”Р›РЇ Р‘РЈР¤Р•Р Рђ Р“Р›РЈР‘РРќР« (D32_FLOAT) ===
 ID3D11Texture2D* m_pDepthBuffer = nullptr;
 ID3D11DepthStencilView* m_pDepthStencilView = nullptr;
 ID3D11DepthStencilState* m_pDepthStencilState = nullptr;
 ID3D11RasterizerState* m_pRasterizerState = nullptr;
 
-// === ПЕРЕМЕННЫЕ ДЛЯ СОСТОЯНИЙ ГЛУБИНЫ ===
-ID3D11DepthStencilState* m_pSkyboxDepthState = nullptr;     // Для skybox
-ID3D11DepthStencilState* m_pNormalDepthState = nullptr;     // Для непрозрачных объектов
-ID3D11DepthStencilState* m_pTransDepthState = nullptr;      // Для прозрачных объектов (без записи глубины)
+// === РџР•Р Р•РњР•РќРќР«Р• Р”Р›РЇ РЎРћРЎРўРћРЇРќРР™ Р“Р›РЈР‘РРќР« ===
+ID3D11DepthStencilState* m_pSkyboxDepthState = nullptr;     // Р”Р»СЏ skybox
+ID3D11DepthStencilState* m_pNormalDepthState = nullptr;     // Р”Р»СЏ РЅРµРїСЂРѕР·СЂР°С‡РЅС‹С… РѕР±СЉРµРєС‚РѕРІ
+ID3D11DepthStencilState* m_pTransDepthState = nullptr;      // Р”Р»СЏ РїСЂРѕР·СЂР°С‡РЅС‹С… РѕР±СЉРµРєС‚РѕРІ (Р±РµР· Р·Р°РїРёСЃРё РіР»СѓР±РёРЅС‹)
 
-// === ПЕРЕМЕННЫЕ ДЛЯ BLEND STATES ===
-ID3D11BlendState* m_pTransBlendState = nullptr;     // Для прозрачных объектов
-ID3D11BlendState* m_pOpaqueBlendState = nullptr;    // Для непрозрачных объектов
+// === РџР•Р Р•РњР•РќРќР«Р• Р”Р›РЇ BLEND STATES ===
+ID3D11BlendState* m_pTransBlendState = nullptr;     // Р”Р»СЏ РїСЂРѕР·СЂР°С‡РЅС‹С… РѕР±СЉРµРєС‚РѕРІ
+ID3D11BlendState* m_pOpaqueBlendState = nullptr;    // Р”Р»СЏ РЅРµРїСЂРѕР·СЂР°С‡РЅС‹С… РѕР±СЉРµРєС‚РѕРІ
 
-// === ПЕРЕМЕННЫЕ ДЛЯ ТЕКСТУР ===
+// === РџР•Р Р•РњР•РќРќР«Р• Р”Р›РЇ РўР•РљРЎРўРЈР  ===
 ID3D11Texture2D* m_pTexture = nullptr;
 ID3D11ShaderResourceView* m_pTextureView = nullptr;
 ID3D11SamplerState* m_pSampler = nullptr;
 
-// === ПЕРЕМЕННЫЕ ДЛЯ SKYBOX ===
+// === РџР•Р Р•РњР•РќРќР«Р• Р”Р›РЇ SKYBOX ===
 ID3D11Buffer* m_pSphereVertexBuffer = nullptr;
 ID3D11Buffer* m_pSphereIndexBuffer = nullptr;
 ID3D11VertexShader* m_pSphereVertexShader = nullptr;
@@ -64,7 +67,7 @@ ID3D11Texture2D* m_pCubemapTexture = nullptr;
 ID3D11ShaderResourceView* m_pCubemapView = nullptr;
 UINT m_sphereIndexCount = 0;
 
-// === ПЕРЕМЕННЫЕ ДЛЯ ПРОЗРАЧНЫХ ОБЪЕКТОВ ===
+// === РџР•Р Р•РњР•РќРќР«Р• Р”Р›РЇ РџР РћР—Р РђР§РќР«РҐ РћР‘РЄР•РљРўРћР’ ===
 struct ColorVertex
 {
     float x, y, z;
@@ -76,14 +79,14 @@ ID3D11Buffer* m_pRectIndexBuffer = nullptr;
 ID3D11VertexShader* m_pRectVertexShader = nullptr;
 ID3D11PixelShader* m_pRectPixelShader = nullptr;
 ID3D11InputLayout* m_pRectInputLayout = nullptr;
-ID3D11Buffer* m_pRectGeomBuffer1 = nullptr;  // Для первого прозрачного прямоугольника
-ID3D11Buffer* m_pRectGeomBuffer2 = nullptr;  // Для второго прозрачного прямоугольника
+ID3D11Buffer* m_pRectGeomBuffer1 = nullptr;  // Р”Р»СЏ РїРµСЂРІРѕРіРѕ РїСЂРѕР·СЂР°С‡РЅРѕРіРѕ РїСЂСЏРјРѕСѓРіРѕР»СЊРЅРёРєР°
+ID3D11Buffer* m_pRectGeomBuffer2 = nullptr;  // Р”Р»СЏ РІС‚РѕСЂРѕРіРѕ РїСЂРѕР·СЂР°С‡РЅРѕРіРѕ РїСЂСЏРјРѕСѓРіРѕР»СЊРЅРёРєР°
 
-// Позиции прозрачных прямоугольников
+// РџРѕР·РёС†РёРё РїСЂРѕР·СЂР°С‡РЅС‹С… РїСЂСЏРјРѕСѓРіРѕР»СЊРЅРёРєРѕРІ
 static const DirectX::XMFLOAT3 Rect0Pos = { 0.0f, 0.0f, 0.0f };
 static const DirectX::XMFLOAT3 Rect1Pos = { 0.2f, 0.0f, 0.0f };
 
-// Bounding box для сортировки
+// Bounding box РґР»СЏ СЃРѕСЂС‚РёСЂРѕРІРєРё
 struct BoundingRect
 {
     DirectX::XMFLOAT3 v[4];
@@ -93,7 +96,7 @@ BoundingRect m_boundingRects[2];
 UINT m_width = 1280;
 UINT m_height = 720;
 
-// === ПЕРЕМЕННЫЕ ДЛЯ УПРАВЛЕНИЯ КАМЕРОЙ ===
+// === РџР•Р Р•РњР•РќРќР«Р• Р”Р›РЇ РЈРџР РђР’Р›Р•РќРРЇ РљРђРњР•Р РћР™ ===
 struct Camera
 {
     DirectX::XMFLOAT3 poi = { 0.0f, 0.0f, 0.0f };
@@ -109,14 +112,14 @@ static const float CameraRotationSpeed = DirectX::XM_PI * 2.0f;
 
 #define SAFE_RELEASE(p) { if (p) { (p)->Release(); (p) = nullptr; } }
 
-// === СТРУКТУРА ВЕРШИНЫ С ТЕКСТУРНЫМИ КООРДИНАТАМИ ===
+// === РЎРўР РЈРљРўРЈР Рђ Р’Р•Р РЁРРќР« РЎ РўР•РљРЎРўРЈР РќР«РњР РљРћРћР Р”РРќРђРўРђРњР ===
 struct TextureVertex
 {
     float x, y, z;
     float u, v;
 };
 
-// === СТРУКТУРЫ ДЛЯ КОНСТАНТНЫХ БУФЕРОВ ===
+// === РЎРўР РЈРљРўРЈР Р« Р”Р›РЇ РљРћРќРЎРўРђРќРўРќР«РҐ Р‘РЈР¤Р•Р РћР’ ===
 struct GeomBuffer
 {
     DirectX::XMFLOAT4X4 m;
@@ -140,18 +143,7 @@ struct RectGeomBuffer
     DirectX::XMFLOAT4 color;
 };
 
-// === СТРУКТУРА ДЛЯ ЗАГРУЗКИ DDS ===
-struct TextureDesc
-{
-    UINT32 pitch = 0;
-    UINT32 mipmapsCount = 0;
-    DXGI_FORMAT fmt = DXGI_FORMAT_UNKNOWN;
-    UINT32 width = 0;
-    UINT32 height = 0;
-    void* pData = nullptr;
-};
-
-// Прототипы функций
+// РџСЂРѕС‚РѕС‚РёРїС‹ С„СѓРЅРєС†РёР№
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 bool InitWindow(HINSTANCE hInstance, int nCmdShow);
 bool InitDirectX();
@@ -167,13 +159,7 @@ void UpdateCamera();
 bool SetupBackBuffer();
 void RenderTransparentObjects();
 
-// === ФУНКЦИИ ДЛЯ РАБОТЫ С DDS ===
-bool LoadDDS(const std::wstring& filepath, TextureDesc& desc, bool singleMip = false);
-UINT32 GetBytesPerBlock(const DXGI_FORMAT& fmt);
-UINT32 DivUp(UINT32 a, UINT32 b);
-std::string WCSToMBS(const std::wstring& wstr);
-
-// === ФУНКЦИЯ СОЗДАНИЯ СФЕРЫ ===
+// === Р¤РЈРќРљР¦РРЇ РЎРћР—Р”РђРќРРЇ РЎР¤Р•Р Р« ===
 void CreateSphere(size_t latCells, size_t lonCells, UINT16* pIndices, DirectX::XMFLOAT3* pPos)
 {
     for (size_t lat = 0; lat < latCells + 1; lat++)
@@ -208,7 +194,7 @@ void CreateSphere(size_t latCells, size_t lonCells, UINT16* pIndices, DirectX::X
     }
 }
 
-// === ФУНКЦИЯ ЗАГРУЗКИ ТЕКСТУРЫ ИЗ DDS ===
+// === Р¤РЈРќРљР¦РРЇ Р—РђР“Р РЈР—РљР РўР•РљРЎРўРЈР Р« РР— DDS ===
 bool LoadTexture(const std::wstring& filepath)
 {
     HRESULT result = S_OK;
@@ -219,7 +205,7 @@ bool LoadTexture(const std::wstring& filepath)
         return false;
     }
 
-    // Проверяем поддержку формата
+    // РџСЂРѕРІРµСЂСЏРµРј РїРѕРґРґРµСЂР¶РєСѓ С„РѕСЂРјР°С‚Р°
     UINT formatSupport = 0;
     if (FAILED(m_pDevice->CheckFormatSupport(textureDesc.fmt, &formatSupport)) ||
         !(formatSupport & D3D11_FORMAT_SUPPORT_TEXTURE2D))
@@ -228,7 +214,7 @@ bool LoadTexture(const std::wstring& filepath)
         return false;
     }
 
-    // Создаем текстуру
+    // РЎРѕР·РґР°РµРј С‚РµРєСЃС‚СѓСЂСѓ
     D3D11_TEXTURE2D_DESC desc = {};
     desc.Format = textureDesc.fmt;
     desc.ArraySize = 1;
@@ -267,7 +253,7 @@ bool LoadTexture(const std::wstring& filepath)
     if (FAILED(result))
         return false;
 
-    // Создаем view для текстуры
+    // РЎРѕР·РґР°РµРј view РґР»СЏ С‚РµРєСЃС‚СѓСЂС‹
     D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
     srvDesc.Format = desc.Format;
     srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
@@ -277,7 +263,7 @@ bool LoadTexture(const std::wstring& filepath)
     result = m_pDevice->CreateShaderResourceView(m_pTexture, &srvDesc, &m_pTextureView);
     if (FAILED(result)) return false;
 
-    // Создаем семплер
+    // РЎРѕР·РґР°РµРј СЃРµРјРїР»РµСЂ
     D3D11_SAMPLER_DESC samplerDesc = {};
     samplerDesc.Filter = D3D11_FILTER_ANISOTROPIC;
     samplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
@@ -294,26 +280,26 @@ bool LoadTexture(const std::wstring& filepath)
     return SUCCEEDED(result);
 }
 
-// === НОВАЯ ФУНКЦИЯ ДЛЯ ИНИЦИАЛИЗАЦИИ ПРОЗРАЧНЫХ ОБЪЕКТОВ ===
+// === РќРћР’РђРЇ Р¤РЈРќРљР¦РРЇ Р”Р›РЇ РРќРР¦РРђР›РР—РђР¦РР РџР РћР—Р РђР§РќР«РҐ РћР‘РЄР•РљРўРћР’ ===
 bool InitTransparentObjects()
 {
     HRESULT result = S_OK;
 
-    // Вершины для прозрачного прямоугольника
+    // Р’РµСЂС€РёРЅС‹ РґР»СЏ РїСЂРѕР·СЂР°С‡РЅРѕРіРѕ РїСЂСЏРјРѕСѓРіРѕР»СЊРЅРёРєР°
     static const ColorVertex RectVertices[] =
     {
-        // Белый цвет (0xFFFFFFFF), альфа = 1.0
-        // Фактический цвет будет задаваться в константном буфере
+        // Р‘РµР»С‹Р№ С†РІРµС‚ (0xFFFFFFFF), Р°Р»СЊС„Р° = 1.0
+        // Р¤Р°РєС‚РёС‡РµСЃРєРёР№ С†РІРµС‚ Р±СѓРґРµС‚ Р·Р°РґР°РІР°С‚СЊСЃСЏ РІ РєРѕРЅСЃС‚Р°РЅС‚РЅРѕРј Р±СѓС„РµСЂРµ
       {0.0f, -0.75f, -0.75f, 0xFFFFFFFF},
       {0.0f,  0.75f, -0.75f, 0xFFFFFFFF},
       {0.0f,  0.75f,  0.75f, 0xFFFFFFFF},
       {0.0f, -0.75f,  0.75f, 0xFFFFFFFF}
     };
 
-    // Индексы для прямоугольника (два треугольника)
+    // РРЅРґРµРєСЃС‹ РґР»СЏ РїСЂСЏРјРѕСѓРіРѕР»СЊРЅРёРєР° (РґРІР° С‚СЂРµСѓРіРѕР»СЊРЅРёРєР°)
     static const USHORT RectIndices[] = { 0, 1, 2, 0, 2, 3 };
 
-    // Сохраняем bounding box для сортировки
+    // РЎРѕС…СЂР°РЅСЏРµРј bounding box РґР»СЏ СЃРѕСЂС‚РёСЂРѕРІРєРё
     for (int i = 0; i < 4; i++)
     {
         m_boundingRects[0].v[i] = { RectVertices[i].x + Rect0Pos.x,
@@ -324,7 +310,7 @@ bool InitTransparentObjects()
                                    RectVertices[i].z + Rect1Pos.z };
     }
 
-    // Создаем vertex buffer для прямоугольника
+    // РЎРѕР·РґР°РµРј vertex buffer РґР»СЏ РїСЂСЏРјРѕСѓРіРѕР»СЊРЅРёРєР°
     D3D11_BUFFER_DESC vbDesc = {};
     vbDesc.ByteWidth = sizeof(RectVertices);
     vbDesc.Usage = D3D11_USAGE_IMMUTABLE;
@@ -341,7 +327,7 @@ bool InitTransparentObjects()
     result = m_pDevice->CreateBuffer(&vbDesc, &vbData, &m_pRectVertexBuffer);
     if (FAILED(result)) return false;
 
-    // Создаем index buffer для прямоугольника
+    // РЎРѕР·РґР°РµРј index buffer РґР»СЏ РїСЂСЏРјРѕСѓРіРѕР»СЊРЅРёРєР°
     D3D11_BUFFER_DESC ibDesc = {};
     ibDesc.ByteWidth = sizeof(RectIndices);
     ibDesc.Usage = D3D11_USAGE_IMMUTABLE;
@@ -358,7 +344,7 @@ bool InitTransparentObjects()
     result = m_pDevice->CreateBuffer(&ibDesc, &ibData, &m_pRectIndexBuffer);
     if (FAILED(result)) return false;
 
-    // Шейдеры для прозрачных объектов
+    // РЁРµР№РґРµСЂС‹ РґР»СЏ РїСЂРѕР·СЂР°С‡РЅС‹С… РѕР±СЉРµРєС‚РѕРІ
     const char* rectVSSource = R"(
         cbuffer GeomBuffer : register(b0)
         {
@@ -390,7 +376,7 @@ bool InitTransparentObjects()
             float4 worldPos = mul(float4(vertex.pos, 1.0), m);
             result.pos = mul(worldPos, vp);
             
-            // Распаковываем цвет из DWORD в float4
+            // Р Р°СЃРїР°РєРѕРІС‹РІР°РµРј С†РІРµС‚ РёР· DWORD РІ float4
             float4 unpackedColor;
             unpackedColor.a = ((vertex.color >> 24) & 0xFF) / 255.0;
             unpackedColor.r = ((vertex.color >> 16) & 0xFF) / 255.0;
@@ -415,7 +401,7 @@ bool InitTransparentObjects()
         }
     )";
 
-    // Компилируем и создаем шейдеры
+    // РљРѕРјРїРёР»РёСЂСѓРµРј Рё СЃРѕР·РґР°РµРј С€РµР№РґРµСЂС‹
     ID3DBlob* pRectVSBlob = nullptr;
     ID3DBlob* pRectPSBlob = nullptr;
     ID3DBlob* pErrorBlob = nullptr;
@@ -457,7 +443,7 @@ bool InitTransparentObjects()
         return false;
     }
 
-    // Создаем input layout для прямоугольника
+    // РЎРѕР·РґР°РµРј input layout РґР»СЏ РїСЂСЏРјРѕСѓРіРѕР»СЊРЅРёРєР°
     D3D11_INPUT_ELEMENT_DESC rectLayout[] = {
         { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
         { "COLOR", 0, DXGI_FORMAT_R8G8B8A8_UNORM, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 }
@@ -471,7 +457,7 @@ bool InitTransparentObjects()
 
     if (FAILED(result)) return false;
 
-    // Создаем константные буферы для прямоугольников
+    // РЎРѕР·РґР°РµРј РєРѕРЅСЃС‚Р°РЅС‚РЅС‹Рµ Р±СѓС„РµСЂС‹ РґР»СЏ РїСЂСЏРјРѕСѓРіРѕР»СЊРЅРёРєРѕРІ
     D3D11_BUFFER_DESC rectGeomBufferDesc = {};
     rectGeomBufferDesc.ByteWidth = sizeof(RectGeomBuffer);
     rectGeomBufferDesc.Usage = D3D11_USAGE_DEFAULT;
@@ -480,23 +466,23 @@ bool InitTransparentObjects()
     rectGeomBufferDesc.MiscFlags = 0;
     rectGeomBufferDesc.StructureByteStride = 0;
 
-    // Первый прямоугольник
+    // РџРµСЂРІС‹Р№ РїСЂСЏРјРѕСѓРіРѕР»СЊРЅРёРє
     RectGeomBuffer rectGeomData1;
     DirectX::XMMATRIX model1 = DirectX::XMMatrixTranslation(Rect0Pos.x, Rect0Pos.y, Rect0Pos.z);
     DirectX::XMMATRIX modelT1 = DirectX::XMMatrixTranspose(model1);
     DirectX::XMStoreFloat4x4(&rectGeomData1.m, modelT1);
-    rectGeomData1.color = DirectX::XMFLOAT4(1.0f, 1.0f, 0.0f, 0.7f); // Альфа = 0.7 (менее прозрачный)
+    rectGeomData1.color = DirectX::XMFLOAT4(1.0f, 1.0f, 0.0f, 0.7f); // РђР»СЊС„Р° = 0.7 (РјРµРЅРµРµ РїСЂРѕР·СЂР°С‡РЅС‹Р№)
 
     D3D11_SUBRESOURCE_DATA rectGeomInitData1 = { &rectGeomData1, 0, 0 };
     result = m_pDevice->CreateBuffer(&rectGeomBufferDesc, &rectGeomInitData1, &m_pRectGeomBuffer1);
     if (FAILED(result)) return false;
 
-    // Второй прямоугольник 
+    // Р’С‚РѕСЂРѕР№ РїСЂСЏРјРѕСѓРіРѕР»СЊРЅРёРє 
     RectGeomBuffer rectGeomData2;
     DirectX::XMMATRIX model2 = DirectX::XMMatrixTranslation(Rect1Pos.x, Rect1Pos.y, Rect1Pos.z);
     DirectX::XMMATRIX modelT2 = DirectX::XMMatrixTranspose(model2);
     DirectX::XMStoreFloat4x4(&rectGeomData2.m, modelT2);
-    rectGeomData2.color = DirectX::XMFLOAT4(0.0f, 0.0f, 1.0f, 0.3f); // Альфа = 0.3 (более прозрачный)
+    rectGeomData2.color = DirectX::XMFLOAT4(0.0f, 0.0f, 1.0f, 0.3f); // РђР»СЊС„Р° = 0.3 (Р±РѕР»РµРµ РїСЂРѕР·СЂР°С‡РЅС‹Р№)
 
     D3D11_SUBRESOURCE_DATA rectGeomInitData2 = { &rectGeomData2, 0, 0 };
     result = m_pDevice->CreateBuffer(&rectGeomBufferDesc, &rectGeomInitData2, &m_pRectGeomBuffer2);
@@ -508,50 +494,50 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 {
     if (!InitWindow(hInstance, nCmdShow))
     {
-        MessageBox(NULL, L"Не удалось создать окно!", L"Ошибка", MB_OK);
+        MessageBox(NULL, L"РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕР·РґР°С‚СЊ РѕРєРЅРѕ!", L"РћС€РёР±РєР°", MB_OK);
         return -1;
     }
 
     if (!InitDirectX())
     {
-        MessageBox(NULL, L"Не удалось инициализировать DirectX!", L"Ошибка", MB_OK);
+        MessageBox(NULL, L"РќРµ СѓРґР°Р»РѕСЃСЊ РёРЅРёС†РёР°Р»РёР·РёСЂРѕРІР°С‚СЊ DirectX!", L"РћС€РёР±РєР°", MB_OK);
         Cleanup();
         return -1;
     }
 
     if (!InitCube())
     {
-        MessageBox(NULL, L"Не удалось инициализировать кубик!", L"Ошибка", MB_OK);
+        MessageBox(NULL, L"РќРµ СѓРґР°Р»РѕСЃСЊ РёРЅРёС†РёР°Р»РёР·РёСЂРѕРІР°С‚СЊ РєСѓР±РёРє!", L"РћС€РёР±РєР°", MB_OK);
         Cleanup();
         return -1;
     }
 
     if (!InitBuffers())
     {
-        MessageBox(NULL, L"Не удалось инициализировать буферы!", L"Ошибка", MB_OK);
+        MessageBox(NULL, L"РќРµ СѓРґР°Р»РѕСЃСЊ РёРЅРёС†РёР°Р»РёР·РёСЂРѕРІР°С‚СЊ Р±СѓС„РµСЂС‹!", L"РћС€РёР±РєР°", MB_OK);
         Cleanup();
         return -1;
     }
 
-    // Загружаем текстуру для куба
-    if (!LoadTexture(L"Kitty.dds")) // формат dxt3
+    // Р—Р°РіСЂСѓР¶Р°РµРј С‚РµРєСЃС‚СѓСЂСѓ РґР»СЏ РєСѓР±Р°
+    if (!LoadTexture(L"Kitty.dds")) // С„РѕСЂРјР°С‚ dxt3
     {
-        MessageBox(NULL, L"Не удалось загрузить текстуру cube!", L"Ошибка", MB_OK);
+        MessageBox(NULL, L"РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ С‚РµРєСЃС‚СѓСЂСѓ cube!", L"РћС€РёР±РєР°", MB_OK);
         Cleanup();
         return -1;
     }
 
     if (!InitSkybox())
     {
-        MessageBox(NULL, L"Не удалось инициализировать skybox!", L"Ошибка", MB_OK);
+        MessageBox(NULL, L"РќРµ СѓРґР°Р»РѕСЃСЊ РёРЅРёС†РёР°Р»РёР·РёСЂРѕРІР°С‚СЊ skybox!", L"РћС€РёР±РєР°", MB_OK);
         Cleanup();
         return -1;
     }
 
-    // Инициализируем прозрачные объекты
+    // РРЅРёС†РёР°Р»РёР·РёСЂСѓРµРј РїСЂРѕР·СЂР°С‡РЅС‹Рµ РѕР±СЉРµРєС‚С‹
     if (!InitTransparentObjects())
     {
-        MessageBox(NULL, L"Не удалось инициализировать прозрачные объекты!", L"Ошибка", MB_OK);
+        MessageBox(NULL, L"РќРµ СѓРґР°Р»РѕСЃСЊ РёРЅРёС†РёР°Р»РёР·РёСЂРѕРІР°С‚СЊ РїСЂРѕР·СЂР°С‡РЅС‹Рµ РѕР±СЉРµРєС‚С‹!", L"РћС€РёР±РєР°", MB_OK);
         Cleanup();
         return -1;
     }
@@ -602,7 +588,7 @@ bool InitWindow(HINSTANCE hInstance, int nCmdShow)
 
     g_hWnd = CreateWindow(
         L"DirectX11Window",
-        L"DirectX 11 - Два текстурированных кубика, Skybox и прозрачные объекты",
+        L"DirectX 11 - Р”РІР° С‚РµРєСЃС‚СѓСЂРёСЂРѕРІР°РЅРЅС‹С… РєСѓР±РёРєР°, Skybox Рё РїСЂРѕР·СЂР°С‡РЅС‹Рµ РѕР±СЉРµРєС‚С‹",
         WS_OVERLAPPEDWINDOW,
         100, 100,
         rc.right - rc.left,
@@ -765,9 +751,9 @@ bool InitDirectX()
     result = m_pDevice->CreateRasterizerState(&rasterDesc, &m_pRasterizerState);
     if (FAILED(result)) return false;
 
-    // === СОЗДАНИЕ СОСТОЯНИЙ ГЛУБИНЫ ДЛЯ REVERSED DEPTH ===
+    // === РЎРћР—Р”РђРќРР• РЎРћРЎРўРћРЇРќРР™ Р“Р›РЈР‘РРќР« Р”Р›РЇ REVERSED DEPTH ===
 
-    // Для непрозрачных объектов (кубы) - reversed depth
+    // Р”Р»СЏ РЅРµРїСЂРѕР·СЂР°С‡РЅС‹С… РѕР±СЉРµРєС‚РѕРІ (РєСѓР±С‹) - reversed depth
     D3D11_DEPTH_STENCIL_DESC opaqueDepthDesc = {};
     opaqueDepthDesc.DepthEnable = TRUE;
     opaqueDepthDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
@@ -777,7 +763,7 @@ bool InitDirectX()
     result = m_pDevice->CreateDepthStencilState(&opaqueDepthDesc, &m_pNormalDepthState);
     if (FAILED(result)) return false;
 
-    // Для skybox - reversed depth, без записи, GREATER_EQUAL
+    // Р”Р»СЏ skybox - reversed depth, Р±РµР· Р·Р°РїРёСЃРё, GREATER_EQUAL
     D3D11_DEPTH_STENCIL_DESC skyboxDepthDesc = {};
     skyboxDepthDesc.DepthEnable = TRUE;
     skyboxDepthDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
@@ -787,7 +773,7 @@ bool InitDirectX()
     result = m_pDevice->CreateDepthStencilState(&skyboxDepthDesc, &m_pSkyboxDepthState);
     if (FAILED(result)) return false;
 
-    // Для прозрачных объектов - reversed depth, без записи
+    // Р”Р»СЏ РїСЂРѕР·СЂР°С‡РЅС‹С… РѕР±СЉРµРєС‚РѕРІ - reversed depth, Р±РµР· Р·Р°РїРёСЃРё
     D3D11_DEPTH_STENCIL_DESC transDepthDesc = {};
     transDepthDesc.DepthEnable = TRUE;
     transDepthDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
@@ -797,9 +783,9 @@ bool InitDirectX()
     result = m_pDevice->CreateDepthStencilState(&transDepthDesc, &m_pTransDepthState);
     if (FAILED(result)) return false;
 
-    // === СОЗДАНИЕ BLEND STATES ===
+    // === РЎРћР—Р”РђРќРР• BLEND STATES ===
 
-    // Для прозрачных объектов
+    // Р”Р»СЏ РїСЂРѕР·СЂР°С‡РЅС‹С… РѕР±СЉРµРєС‚РѕРІ
     D3D11_BLEND_DESC blendDesc = {};
     blendDesc.AlphaToCoverageEnable = FALSE;
     blendDesc.IndependentBlendEnable = FALSE;
@@ -815,7 +801,7 @@ bool InitDirectX()
     result = m_pDevice->CreateBlendState(&blendDesc, &m_pTransBlendState);
     if (FAILED(result)) return false;
 
-    // Для непрозрачных объектов (отключено смешивание)
+    // Р”Р»СЏ РЅРµРїСЂРѕР·СЂР°С‡РЅС‹С… РѕР±СЉРµРєС‚РѕРІ (РѕС‚РєР»СЋС‡РµРЅРѕ СЃРјРµС€РёРІР°РЅРёРµ)
     blendDesc.RenderTarget[0].BlendEnable = FALSE;
     result = m_pDevice->CreateBlendState(&blendDesc, &m_pOpaqueBlendState);
 
@@ -839,7 +825,7 @@ bool SetupBackBuffer()
     SAFE_RELEASE(pBackBuffer);
     if (FAILED(result)) return false;
 
-    // === СОЗДАНИЕ БУФЕРА ГЛУБИНЫ D32_FLOAT ===
+    // === РЎРћР—Р”РђРќРР• Р‘РЈР¤Р•Р Рђ Р“Р›РЈР‘РРќР« D32_FLOAT ===
     D3D11_TEXTURE2D_DESC depthDesc = {};
     depthDesc.Width = m_width;
     depthDesc.Height = m_height;
@@ -890,7 +876,7 @@ bool InitBuffers()
     result = m_pDevice->CreateBuffer(&geomBufferDesc, &geomInitData, &m_pGeomBuffer);
     if (FAILED(result)) return false;
 
-    // Создаем второй буфер для второго куба
+    // РЎРѕР·РґР°РµРј РІС‚РѕСЂРѕР№ Р±СѓС„РµСЂ РґР»СЏ РІС‚РѕСЂРѕРіРѕ РєСѓР±Р°
     result = m_pDevice->CreateBuffer(&geomBufferDesc, &geomInitData, &m_pGeomBuffer2);
     if (FAILED(result)) return false;
 
@@ -1202,7 +1188,7 @@ bool InitSkybox()
             float4 worldPos = mul(float4(input.pos * size.x, 1.0), m);
             worldPos.xyz += cameraPos.xyz;
             output.pos = mul(worldPos, vp);
-            // КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: выставляем z = 0 для skybox (reversed depth)
+            // РљР›Р®Р§Р•Р’РћР• РРЎРџР РђР’Р›Р•РќРР•: РІС‹СЃС‚Р°РІР»СЏРµРј z = 0 РґР»СЏ skybox (reversed depth)
             output.pos.z = 0.0;
             output.localPos = input.pos;
             return output;
@@ -1297,7 +1283,7 @@ bool InitSkybox()
     result = m_pDevice->CreateBuffer(&sphereGeomBufferDesc, &sphereGeomInitData, &m_pSphereGeomBuffer);
     if (FAILED(result)) return false;
 
-    // Загрузка cubemap текстур
+    // Р—Р°РіСЂСѓР·РєР° cubemap С‚РµРєСЃС‚СѓСЂ
     const std::wstring TextureNames[6] = {
         //L"background_posx.dds", L"background_negx.dds",
         //L"background_posy.dds", L"background_negy.dds",
@@ -1326,7 +1312,7 @@ bool InitSkybox()
 
     DXGI_FORMAT textureFmt = texDescs[0].fmt;
 
-    // Проверяем поддержку формата cubemap
+    // РџСЂРѕРІРµСЂСЏРµРј РїРѕРґРґРµСЂР¶РєСѓ С„РѕСЂРјР°С‚Р° cubemap
     UINT cubemapFormatSupport = 0;
     if (FAILED(m_pDevice->CheckFormatSupport(textureFmt, &cubemapFormatSupport)) ||
         !(cubemapFormatSupport & D3D11_FORMAT_SUPPORT_TEXTURECUBE))
@@ -1338,7 +1324,7 @@ bool InitSkybox()
         return false;
     }
 
-    // Создаем cubemap текстуру
+    // РЎРѕР·РґР°РµРј cubemap С‚РµРєСЃС‚СѓСЂСѓ
     D3D11_TEXTURE2D_DESC cubemapDesc = {};
     cubemapDesc.Format = textureFmt;
     cubemapDesc.ArraySize = 6;
@@ -1379,7 +1365,7 @@ bool InitSkybox()
         free(texDescs[i].pData);
     }
 
-    // Создаем view для cubemap
+    // РЎРѕР·РґР°РµРј view РґР»СЏ cubemap
     D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc;
     srvDesc.Format = textureFmt;
     srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURECUBE;
@@ -1403,21 +1389,21 @@ void UpdateCamera()
 
     DirectX::XMMATRIX view = DirectX::XMMatrixLookAtLH(eye, at, up);
 
-    // === REVERSED DEPTH: матрица проекции с far и near в обратном порядке ===
+    // === REVERSED DEPTH: РјР°С‚СЂРёС†Р° РїСЂРѕРµРєС†РёРё СЃ far Рё near РІ РѕР±СЂР°С‚РЅРѕРј РїРѕСЂСЏРґРєРµ ===
     float f = 100.0f;
     float n = 0.1f;
     float fov = (float)DirectX::XM_PI / 3;
     float aspectRatio = (float)m_width / m_height;
 
-    // Используем перспективную проекцию с reversed depth
+    // РСЃРїРѕР»СЊР·СѓРµРј РїРµСЂСЃРїРµРєС‚РёРІРЅСѓСЋ РїСЂРѕРµРєС†РёСЋ СЃ reversed depth
     float halfW = tanf(fov / 2) * f;
     float halfH = halfW / aspectRatio;
 
     DirectX::XMMATRIX proj = DirectX::XMMatrixPerspectiveLH(
         halfW * 2.0f,
         halfH * 2.0f,
-        f,  // far plane передается как near
-        n   // near plane передается как far
+        f,  // far plane РїРµСЂРµРґР°РµС‚СЃСЏ РєР°Рє near
+        n   // near plane РїРµСЂРµРґР°РµС‚СЃСЏ РєР°Рє far
     );
 
     DirectX::XMMATRIX vp = DirectX::XMMatrixMultiply(view, proj);
@@ -1434,14 +1420,14 @@ void UpdateCamera()
     }
 }
 
-// === НОВАЯ ФУНКЦИЯ ДЛЯ РЕНДЕРИНГА ПРОЗРАЧНЫХ ОБЪЕКТОВ ===
+// === РќРћР’РђРЇ Р¤РЈРќРљР¦РРЇ Р”Р›РЇ Р Р•РќР”Р•Р РРќР“Рђ РџР РћР—Р РђР§РќР«РҐ РћР‘РЄР•РљРўРћР’ ===
 void RenderTransparentObjects()
 {
-    // Устанавливаем состояние для прозрачных объектов
+    // РЈСЃС‚Р°РЅР°РІР»РёРІР°РµРј СЃРѕСЃС‚РѕСЏРЅРёРµ РґР»СЏ РїСЂРѕР·СЂР°С‡РЅС‹С… РѕР±СЉРµРєС‚РѕРІ
     m_pDeviceContext->OMSetDepthStencilState(m_pTransDepthState, 0);
     m_pDeviceContext->OMSetBlendState(m_pTransBlendState, nullptr, 0xFFFFFFFF);
 
-    // Настраиваем пайплайн для прямоугольников
+    // РќР°СЃС‚СЂР°РёРІР°РµРј РїР°Р№РїР»Р°Р№РЅ РґР»СЏ РїСЂСЏРјРѕСѓРіРѕР»СЊРЅРёРєРѕРІ
     m_pDeviceContext->IASetIndexBuffer(m_pRectIndexBuffer, DXGI_FORMAT_R16_UINT, 0);
     ID3D11Buffer* rectVertexBuffers[] = { m_pRectVertexBuffer };
     UINT rectStrides[] = { sizeof(ColorVertex) };
@@ -1452,7 +1438,7 @@ void RenderTransparentObjects()
     m_pDeviceContext->VSSetShader(m_pRectVertexShader, nullptr, 0);
     m_pDeviceContext->PSSetShader(m_pRectPixelShader, nullptr, 0);
 
-    // Получаем позицию камеры из константного буфера
+    // РџРѕР»СѓС‡Р°РµРј РїРѕР·РёС†РёСЋ РєР°РјРµСЂС‹ РёР· РєРѕРЅСЃС‚Р°РЅС‚РЅРѕРіРѕ Р±СѓС„РµСЂР°
     DirectX::XMFLOAT4 cameraPos;
     {
         D3D11_MAPPED_SUBRESOURCE mapped;
@@ -1464,7 +1450,7 @@ void RenderTransparentObjects()
         }
     }
 
-    // Вычисляем расстояния от камеры до каждого прямоугольника (от дальнего к ближнему)
+    // Р’С‹С‡РёСЃР»СЏРµРј СЂР°СЃСЃС‚РѕСЏРЅРёСЏ РѕС‚ РєР°РјРµСЂС‹ РґРѕ РєР°Р¶РґРѕРіРѕ РїСЂСЏРјРѕСѓРіРѕР»СЊРЅРёРєР° (РѕС‚ РґР°Р»СЊРЅРµРіРѕ Рє Р±Р»РёР¶РЅРµРјСѓ)
     float distances[2] = { 0.0f, 0.0f };
     DirectX::XMVECTOR cameraPosVec = DirectX::XMLoadFloat4(&cameraPos);
 
@@ -1483,7 +1469,7 @@ void RenderTransparentObjects()
         distances[1] = std::max<float>(distances[1], dist1);
     }
 
-    // Сортируем индексы по убыванию расстояния (дальние рисуем первыми) - КРИТИЧНО
+    // РЎРѕСЂС‚РёСЂСѓРµРј РёРЅРґРµРєСЃС‹ РїРѕ СѓР±С‹РІР°РЅРёСЋ СЂР°СЃСЃС‚РѕСЏРЅРёСЏ (РґР°Р»СЊРЅРёРµ СЂРёСЃСѓРµРј РїРµСЂРІС‹РјРё) - РљР РРўРР§РќРћ
     int indices[2] = { 0, 1 };
     if (distances[0] < distances[1])
     {
@@ -1491,7 +1477,7 @@ void RenderTransparentObjects()
         indices[1] = 0;
     }
 
-    // Рисуем прямоугольники в порядке от дальнего к ближнему
+    // Р РёСЃСѓРµРј РїСЂСЏРјРѕСѓРіРѕР»СЊРЅРёРєРё РІ РїРѕСЂСЏРґРєРµ РѕС‚ РґР°Р»СЊРЅРµРіРѕ Рє Р±Р»РёР¶РЅРµРјСѓ
     for (int i = 0; i < 2; i++)
     {
         int idx = indices[i];
@@ -1534,7 +1520,7 @@ void ResizeSwapChain(UINT width, UINT height)
 
     SetupBackBuffer();
 
-    // Обновляем константный буфер сферы (skybox) при изменении размера
+    // РћР±РЅРѕРІР»СЏРµРј РєРѕРЅСЃС‚Р°РЅС‚РЅС‹Р№ Р±СѓС„РµСЂ СЃС„РµСЂС‹ (skybox) РїСЂРё РёР·РјРµРЅРµРЅРёРё СЂР°Р·РјРµСЂР°
     if (m_pSphereGeomBuffer)
     {
         float n = 0.1f;
@@ -1559,7 +1545,7 @@ void Render()
     ID3D11RenderTargetView* views[] = { m_pBackBufferRTV };
     m_pDeviceContext->OMSetRenderTargets(1, views, m_pDepthStencilView);
 
-    // === REVERSED DEPTH: очистка в 0.0f ===
+    // === REVERSED DEPTH: РѕС‡РёСЃС‚РєР° РІ 0.0f ===
     static const FLOAT BackColor[4] = { 0.25f, 0.25f, 0.5f, 1.0f };
     m_pDeviceContext->ClearRenderTargetView(m_pBackBufferRTV, BackColor);
     if (m_pDepthStencilView)
@@ -1578,11 +1564,11 @@ void Render()
 
     UpdateCamera();
 
-    // 1. РЕНДЕРИМ НЕПРОЗРАЧНЫЕ ОБЪЕКТЫ (КУБЫ)
+    // 1. Р Р•РќР”Р•Р РРњ РќР•РџР РћР—Р РђР§РќР«Р• РћР‘РЄР•РљРўР« (РљРЈР‘Р«)
     m_pDeviceContext->OMSetDepthStencilState(m_pNormalDepthState, 0);
     m_pDeviceContext->OMSetBlendState(m_pOpaqueBlendState, nullptr, 0xFFFFFFFF);
 
-    // Рендерим первый куб
+    // Р РµРЅРґРµСЂРёРј РїРµСЂРІС‹Р№ РєСѓР±
     DirectX::XMMATRIX model1 = DirectX::XMMatrixTranslation(-1.0f, 0.0f, 0.0f);
     GeomBuffer geomBufCpu1;
     DirectX::XMMATRIX modelT1 = DirectX::XMMatrixTranspose(model1);
@@ -1609,7 +1595,7 @@ void Render()
     m_pDeviceContext->VSSetConstantBuffers(0, 2, constantBuffers1);
     m_pDeviceContext->DrawIndexed(36, 0, 0);
 
-    // Рендерим второй куб
+    // Р РµРЅРґРµСЂРёРј РІС‚РѕСЂРѕР№ РєСѓР±
     DirectX::XMMATRIX model2 = DirectX::XMMatrixTranslation(1.0f, 0.0f, 0.0f);
     GeomBuffer geomBufCpu2;
     DirectX::XMMATRIX modelT2 = DirectX::XMMatrixTranspose(model2);
@@ -1620,7 +1606,7 @@ void Render()
     m_pDeviceContext->VSSetConstantBuffers(0, 2, constantBuffers2);
     m_pDeviceContext->DrawIndexed(36, 0, 0);
 
-    // 2. РЕНДЕРИМ SKYBOX
+    // 2. Р Р•РќР”Р•Р РРњ SKYBOX
     m_pDeviceContext->OMSetDepthStencilState(m_pSkyboxDepthState, 0);
     m_pDeviceContext->OMSetBlendState(m_pOpaqueBlendState, nullptr, 0xFFFFFFFF);
 
@@ -1642,7 +1628,7 @@ void Render()
 
     m_pDeviceContext->DrawIndexed(m_sphereIndexCount, 0, 0);
 
-    // 3. РЕНДЕРИМ ПРОЗРАЧНЫЕ ОБЪЕКТЫ
+    // 3. Р Р•РќР”Р•Р РРњ РџР РћР—Р РђР§РќР«Р• РћР‘РЄР•РљРўР«
     RenderTransparentObjects();
 
     HRESULT result = m_pSwapChain->Present(1, 0);
@@ -1651,7 +1637,7 @@ void Render()
 
 void Cleanup()
 {
-    // Освобождаем ресурсы прозрачных объектов
+    // РћСЃРІРѕР±РѕР¶РґР°РµРј СЂРµСЃСѓСЂСЃС‹ РїСЂРѕР·СЂР°С‡РЅС‹С… РѕР±СЉРµРєС‚РѕРІ
     SAFE_RELEASE(m_pRectGeomBuffer2);
     SAFE_RELEASE(m_pRectGeomBuffer1);
     SAFE_RELEASE(m_pRectInputLayout);
@@ -1660,11 +1646,11 @@ void Cleanup()
     SAFE_RELEASE(m_pRectIndexBuffer);
     SAFE_RELEASE(m_pRectVertexBuffer);
 
-    // Освобождаем blend states
+    // РћСЃРІРѕР±РѕР¶РґР°РµРј blend states
     SAFE_RELEASE(m_pOpaqueBlendState);
     SAFE_RELEASE(m_pTransBlendState);
 
-    // Освобождаем состояния глубины
+    // РћСЃРІРѕР±РѕР¶РґР°РµРј СЃРѕСЃС‚РѕСЏРЅРёСЏ РіР»СѓР±РёРЅС‹
     SAFE_RELEASE(m_pTransDepthState);
     SAFE_RELEASE(m_pSkyboxDepthState);
     SAFE_RELEASE(m_pNormalDepthState);
@@ -1699,200 +1685,4 @@ void Cleanup()
     SAFE_RELEASE(m_pSwapChain);
     SAFE_RELEASE(m_pDeviceContext);
     SAFE_RELEASE(m_pDevice);
-}
-
-// === РЕАЛИЗАЦИЯ ФУНКЦИЙ ДЛЯ РАБОТЫ С DDS ===
-
-UINT32 DivUp(UINT32 a, UINT32 b)
-{
-    return (a + b - (UINT32)1) / b;
-}
-
-UINT32 GetBytesPerBlock(const DXGI_FORMAT& fmt)
-{
-    switch (fmt)
-    {
-    case DXGI_FORMAT_BC1_TYPELESS:
-    case DXGI_FORMAT_BC1_UNORM:
-    case DXGI_FORMAT_BC1_UNORM_SRGB:
-    case DXGI_FORMAT_BC4_TYPELESS:
-    case DXGI_FORMAT_BC4_UNORM:
-    case DXGI_FORMAT_BC4_SNORM:
-        return 8;
-        break;
-
-    case DXGI_FORMAT_BC2_TYPELESS:
-    case DXGI_FORMAT_BC2_UNORM:
-    case DXGI_FORMAT_BC2_UNORM_SRGB:
-    case DXGI_FORMAT_BC3_TYPELESS:
-    case DXGI_FORMAT_BC3_UNORM:
-    case DXGI_FORMAT_BC3_UNORM_SRGB:
-    case DXGI_FORMAT_BC5_TYPELESS:
-    case DXGI_FORMAT_BC5_UNORM:
-    case DXGI_FORMAT_BC5_SNORM:
-    case DXGI_FORMAT_BC6H_TYPELESS:
-    case DXGI_FORMAT_BC6H_UF16:
-    case DXGI_FORMAT_BC6H_SF16:
-    case DXGI_FORMAT_BC7_TYPELESS:
-    case DXGI_FORMAT_BC7_UNORM:
-    case DXGI_FORMAT_BC7_UNORM_SRGB:
-        return 16;
-        break;
-    }
-    assert(0);
-    return 0;
-}
-
-std::string WCSToMBS(const std::wstring& wstr)
-{
-    size_t len = wstr.length();
-    std::vector<char> res;
-    res.resize(len + 1);
-    size_t resLen = 0;
-    wcstombs_s(&resLen, res.data(), res.size(), wstr.c_str(), len);
-    return res.data();
-}
-
-bool LoadDDS(const std::wstring& filepath, TextureDesc& desc, bool singleMip)
-{
-    FILE* pFile = nullptr;
-    _wfopen_s(&pFile, filepath.c_str(), L"rb");
-    if (pFile == nullptr)
-    {
-        return false;
-    }
-
-    const UINT32 DDSSignature = 0x20534444;
-
-#pragma pack(push, 1)
-    struct PixelFormat
-    {
-        UINT32 size;
-        UINT32 flags;
-        UINT32 fourCC;
-        UINT32 bitCount;
-        UINT32 RMask, GMask, BMask, AMask;
-    };
-
-    struct DDSHeader
-    {
-        UINT32 size;
-        UINT32 flags;
-        UINT32 height;
-        UINT32 width;
-        UINT32 pitchOrLinearSize;
-        UINT32 depth;
-        UINT32 mipMapCount;
-        UINT32 reserved[11];
-        PixelFormat pixelFormat;
-        UINT32 caps, caps2, caps3, caps4;
-        UINT32 reserved2;
-    };
-#pragma pack(pop)
-
-    const UINT32 DDPF_FOURCC = 0x4;
-    const UINT32 DDPF_ALPHAPIXELS = 0x1;
-    const UINT32 DDSD_CAPS = 0x1;
-    const UINT32 DDSD_HEIGHT = 0x2;
-    const UINT32 DDSD_WIDTH = 0x4;
-    const UINT32 DDSD_PITCH = 0x8;
-    const UINT32 DDSD_PIXELFORMAT = 0x1000;
-    const UINT32 DDSD_MIPMAPCOUNT = 0x20000;
-    const UINT32 DDSD_LINEARSIZE = 0x80000;
-    const UINT32 DDSD_DEPTH = 0x800000;
-
-    // Читаем сигнатуру
-    UINT32 signature = 0;
-    if (fread(&signature, 1, sizeof(UINT32), pFile) != sizeof(UINT32) || signature != DDSSignature)
-    {
-        fclose(pFile);
-        return false;
-    }
-
-    // Читаем заголовок DDS
-    DDSHeader header;
-    memset(&header, 0, sizeof(DDSHeader));
-    size_t readSize = fread(&header, 1, sizeof(header), pFile);
-    if (readSize != sizeof(DDSHeader) || readSize != header.size)
-    {
-        fclose(pFile);
-        return false;
-    }
-
-    // Проверяем флаги
-    if (!((header.flags & DDSD_CAPS) != 0 && (header.flags & DDSD_HEIGHT) != 0 &&
-        (header.flags & DDSD_WIDTH) != 0 && (header.flags & DDSD_PIXELFORMAT) != 0))
-    {
-        fclose(pFile);
-        return false;
-    }
-
-    // Получаем формат текстуры
-    char fourCC[5] = { 0 };
-    memcpy(fourCC, &header.pixelFormat.fourCC, 4);
-
-    if (strcmp(fourCC, "DXT1") == 0)
-    {
-        desc.fmt = DXGI_FORMAT_BC1_UNORM;
-    }
-    else if (strcmp(fourCC, "DXT3") == 0)
-    {
-        desc.fmt = DXGI_FORMAT_BC2_UNORM;
-    }
-    else if (strcmp(fourCC, "DXT5") == 0)
-    {
-        desc.fmt = DXGI_FORMAT_BC3_UNORM;
-    }
-    else
-    {
-        fclose(pFile);
-        return false;
-    }
-
-    // Читаем pitch
-    desc.pitch = (header.flags & DDSD_PITCH) != 0 ? (UINT32)header.pitchOrLinearSize : 0;
-
-    // Читаем количество mip уровней
-    desc.mipmapsCount = (header.flags & DDSD_MIPMAPCOUNT) != 0 ? (UINT32)header.mipMapCount : 1;
-
-    if (singleMip)
-    {
-        desc.mipmapsCount = 1;
-    }
-
-    // Устанавливаем размер изображения
-    desc.width = header.width;
-    desc.height = header.height;
-
-    // Получаем размер данных
-    UINT32 dataSize = (header.flags & DDSD_LINEARSIZE) != 0 ? (UINT32)header.pitchOrLinearSize : 0;
-    if (dataSize == 0)
-    {
-        long long curPos = _ftelli64(pFile);
-        fseek(pFile, 0, SEEK_END);
-        dataSize = (UINT32)(_ftelli64(pFile) - curPos);
-        fseek(pFile, (int)curPos, SEEK_SET);
-    }
-    else
-    {
-        UINT32 levelSize = dataSize / 4;
-        for (UINT32 i = 1; i < desc.mipmapsCount; i++)
-        {
-            dataSize += levelSize;
-            levelSize = std::max<UINT32>(16u, levelSize / 4);
-        }
-    }
-
-    desc.pData = malloc(dataSize);
-    readSize = fread(desc.pData, 1, dataSize, pFile);
-    if (readSize != dataSize)
-    {
-        free(desc.pData);
-        desc.pData = nullptr;
-        fclose(pFile);
-        return false;
-    }
-
-    fclose(pFile);
-    return true;
 }
