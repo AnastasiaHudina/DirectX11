@@ -337,6 +337,7 @@ bool LoadNormalMap()
     HRESULT result = S_OK;
 
     TextureDesc textureDesc;
+    //if (!LoadDDS(L"IceNM.dds", textureDesc))
     if (!LoadDDS(L"BrickNM.dds", textureDesc))
     {
         return false;
@@ -854,6 +855,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     }
 
     // Загружаем текстуру для куба
+    //if (!LoadTexture(L"Ice.dds"))
     if (!LoadTexture(L"Brick.dds"))
     {
         MessageBox(NULL, L"Не удалось загрузить текстуру куба!", L"Ошибка", MB_OK);
