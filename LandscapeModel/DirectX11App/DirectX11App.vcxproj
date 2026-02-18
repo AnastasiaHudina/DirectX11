@@ -145,7 +145,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="DDS.h" />
+    <ClInclude Include="Texture.h" />
     <ClInclude Include="DirectX11App.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="imgui\imconfig.h" />
@@ -163,7 +163,7 @@
     <ClInclude Include="tinyexr\tinyexr.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="DDS.cpp" />
+    <ClCompile Include="Texture.cpp" />
     <ClCompile Include="DirectX11App.cpp" />
     <ClCompile Include="imgui\imgui.cpp" />
     <ClCompile Include="imgui\imgui_draw.cpp" />

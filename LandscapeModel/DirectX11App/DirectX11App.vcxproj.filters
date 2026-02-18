@@ -27,7 +27,7 @@
     <ClInclude Include="DirectX11App.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="DDS.h">
+    <ClInclude Include="Texture.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
     <ClInclude Include="Light.h">
@@ -68,7 +68,7 @@
     <ClCompile Include="DirectX11App.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
-    <ClCompile Include="DDS.cpp">
+    <ClCompile Include="Texture.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
     <ClCompile Include="imgui\imgui.cpp">
