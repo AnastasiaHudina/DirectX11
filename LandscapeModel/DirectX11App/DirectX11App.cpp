@@ -173,7 +173,7 @@ UINT m_terrainGridSizeX = 256;                        // кол-во верши�
 UINT m_terrainGridSizeZ = 256;                        // кол-во вершин по Z
 float m_terrainWidth = 20.0f;                          // ширина ландшафта по X
 float m_terrainDepth = 20.0f;                          // глубина ландшафта по Z
-float m_terrainHeightScale = 2.0f;                     // масштаб высоты
+float m_terrainHeightScale = 2.5f;                     // масштаб высоты
 
 // === ПЕРЕМЕННЫЕ ДЛЯ МАТРИЦ И УПРАВЛЕНИЯ ===
 ID3D11Buffer* m_pSceneBuffer = nullptr;               // константный буфер сцены
@@ -2393,4 +2393,5 @@ void Cleanup()
 
     // Завершаем COM
     CoUninitialize();
+
 }
