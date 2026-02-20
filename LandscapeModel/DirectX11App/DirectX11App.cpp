@@ -31,7 +31,7 @@
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "d3dcompiler.lib")
 
-// Включаем заголовочные файл для работы с DDS и освещением
+// Включаем заголовочные файлы для работы с текстурами и освещением
 #include "Texture.h"
 #include "Light.h"
 
@@ -41,6 +41,7 @@
 // Явное объявление для ImGui функции
 extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
+// Перечисление возможных пост-эффектов
 enum PostProcessEffect {
     PP_NONE = 0,
     PP_SEPIA = 1,
@@ -49,6 +50,7 @@ enum PostProcessEffect {
 };
 
 // === СТРУКТУРЫ ДЛЯ КОНСТАНТНЫХ БУФЕРОВ ===
+// Геометрический буфер для каждого объекта (матрица модели, матрица нормалей, параметры материала)
 struct GeomBuffer
 {
     DirectX::XMFLOAT4X4 m;
@@ -57,26 +59,29 @@ struct GeomBuffer
     DirectX::XMFLOAT4 posAngle;
 };
 
+// Буфер сцены (данные, общие для всех объектов)
 struct SceneBuffer
 {
-    DirectX::XMFLOAT4X4 vp;
-    DirectX::XMFLOAT4 cameraPos;
-    DirectX::XMFLOAT4 lightInfo;
-    Light lights[10];
-    DirectX::XMFLOAT4 ambientColor;
+    DirectX::XMFLOAT4X4 vp;                 // матрица вида-проекции
+    DirectX::XMFLOAT4 cameraPos;             // позиция камеры в мировых координатах
+    DirectX::XMFLOAT4 lightInfo;             // x - количество источников, y - использовать карты нормалей, z - показывать нормали, w - сила детали
+    Light lights[10];                        // массив источников света (до 10)
+    DirectX::XMFLOAT4 ambientColor;          // цвет фонового (ambient) освещения
 
 };
 
+// Буфер для постпроцессинга
 struct PostProcessBuffer
 {
     int effectType;    // 0 - нет, 1 - сепия, 2 - холодный тон, 3 - ночной режим
     int padding[3];    // Выравнивание
 };
 
+// Геометрический буфер для маленьких сфер (визуализация источников света)
 struct SmallSphereGeomBuffer
 {
-    DirectX::XMFLOAT4X4 m;
-    DirectX::XMFLOAT4 color;
+    DirectX::XMFLOAT4X4 m;      // матрица модели
+    DirectX::XMFLOAT4 color;     // цвет сферы (цвет источника)
 };
 
 // === ПРОТОТИПЫ ФУНКЦИЙ ===
@@ -101,111 +106,112 @@ void CreateSphere(size_t latCells, size_t lonCells, UINT16* pIndices, DirectX::X
 
 // Глобальные переменные
 HWND g_hWnd = NULL;
-ID3D11Device* m_pDevice = nullptr;
-ID3D11DeviceContext* m_pDeviceContext = nullptr;
-IDXGISwapChain* m_pSwapChain = nullptr;
-ID3D11RenderTargetView* m_pBackBufferRTV = nullptr;
+ID3D11Device* m_pDevice = nullptr;                 // устройство Direct3D
+ID3D11DeviceContext* m_pDeviceContext = nullptr;   // контекст устройства (для рисования)
+IDXGISwapChain* m_pSwapChain = nullptr;            // цепочка обмена (для отображения на экране)
+ID3D11RenderTargetView* m_pBackBufferRTV = nullptr; // представление заднего буфера как цели рендера
 
 // === ПЕРЕМЕННЫЕ ДЛЯ ОСВЕЩЕНИЯ ===
-Light m_lights[10]; // Массив источников света
-DirectX::XMFLOAT4 m_ambientColor = { 0.1f, 0.1f, 0.2f, 1.0f };
-int m_lightCount = 1; // Количество активных источников света
-bool m_useNormalMaps = true;
-bool m_showNormals = false;
-bool m_showLightBulbs = true;
+Light m_lights[10];                                 // массив источников света
+DirectX::XMFLOAT4 m_ambientColor = { 0.1f, 0.1f, 0.2f, 1.0f }; // цвет фонового освещения
+int m_lightCount = 1;                               // количество активных источников
+bool m_useNormalMaps = true;                        // флаг использования карт нормалей
+bool m_showNormals = false;                          // флаг визуализации нормалей (для отладки)
+bool m_showLightBulbs = true;                        // показывать ли сферы-лампочки для источников
 
 // === ПЕРЕМЕННЫЕ ДЛЯ КАРТЫ НОРМАЛЕЙ ===
-ID3D11Texture2D* m_pTextureNM = nullptr;
-ID3D11ShaderResourceView* m_pTextureViewNM = nullptr;
+ID3D11Texture2D* m_pTextureNM = nullptr;             // текстура карты нормалей
+ID3D11ShaderResourceView* m_pTextureViewNM = nullptr; // шейдерное представление карты нормалей
 
 // === ПЕРЕМЕННЫЕ ДЛЯ ТЕКСТУРЫ ДЕТАЛЕЙ ===
-ID3D11ShaderResourceView* m_pDetailTextureView = nullptr;
+ID3D11ShaderResourceView* m_pDetailTextureView = nullptr; // шейдерное представление текстуры деталей
 
 // === ПЕРЕМЕННЫЕ ДЛЯ ПОСТПРОЦЕССИНГА ===
-ID3D11Texture2D* m_pColorBuffer = nullptr;
-ID3D11RenderTargetView* m_pColorBufferRTV = nullptr;
-ID3D11ShaderResourceView* m_pColorBufferSRV = nullptr;
-ID3D11PixelShader* m_pPostProcessPixelShader = nullptr;
-ID3D11VertexShader* m_pPostProcessVertexShader = nullptr;
-ID3D11Buffer* m_pPostProcessBuffer = nullptr;
-int m_postProcessEffect = 0;            // 0 - нет эффекта
-float m_detailStrength = 0.5f; // сила влияния детали (0 - нет эффекта, 1 - полный)
+ID3D11Texture2D* m_pColorBuffer = nullptr;           // текстура для промежуточного рендера (цвет)
+ID3D11RenderTargetView* m_pColorBufferRTV = nullptr; // цель рендера для промежуточной текстуры
+ID3D11ShaderResourceView* m_pColorBufferSRV = nullptr; // шейдерное представление для чтения в постпроцессинге
+ID3D11PixelShader* m_pPostProcessPixelShader = nullptr;   // пиксельный шейдер постпроцессинга
+ID3D11VertexShader* m_pPostProcessVertexShader = nullptr; // вершинный шейдер постпроцессинга (рисует треугольник)
+ID3D11Buffer* m_pPostProcessBuffer = nullptr;        // константный буфер для параметров постпроцессинга
+int m_postProcessEffect = 0;                         // текущий выбранный эффект (0 - нет)
+float m_detailStrength = 0.5f;                       // сила влияния детали (0..2)
 
 // === ПЕРЕМЕННЫЕ ДЛЯ МАЛЕНЬКИХ СФЕР (ВИЗУАЛИЗАЦИЯ ИСТОЧНИКОВ) ===
-ID3D11Buffer* m_pSmallSphereVertexBuffer = nullptr;
-ID3D11Buffer* m_pSmallSphereIndexBuffer = nullptr;
-ID3D11VertexShader* m_pSmallSphereVertexShader = nullptr;
-ID3D11PixelShader* m_pSmallSpherePixelShader = nullptr;
-ID3D11InputLayout* m_pSmallSphereInputLayout = nullptr;
-ID3D11Buffer* m_pSmallSphereGeomBuffers[10]; // Константные буферы для каждой сферы
-UINT m_smallSphereIndexCount = 0;
+ID3D11Buffer* m_pSmallSphereVertexBuffer = nullptr;   // вершинный буфер сферы
+ID3D11Buffer* m_pSmallSphereIndexBuffer = nullptr;    // индексный буфер сферы
+ID3D11VertexShader* m_pSmallSphereVertexShader = nullptr;   // вершинный шейдер для сфер
+ID3D11PixelShader* m_pSmallSpherePixelShader = nullptr;     // пиксельный шейдер для сфер
+ID3D11InputLayout* m_pSmallSphereInputLayout = nullptr;     // описание входных данных вершин
+ID3D11Buffer* m_pSmallSphereGeomBuffers[10];                 // константные буферы для каждой сферы
+UINT m_smallSphereIndexCount = 0;                            // количество индексов в сфере
 
 // === ПЕРЕМЕННЫЕ ДЛЯ ImGui ===
-bool m_showImGui = true;
+bool m_showImGui = true;                             // показывать ли интерфейс ImGui
 
 // === ПЕРЕМЕННЫЕ ДЛЯ ПЕРЕМЕЩЕНИЯ КАМЕРЫ ===
-bool m_keyW = false;
-bool m_keyA = false;
-bool m_keyS = false;
-bool m_keyD = false;
-bool m_keyQ = false;
-bool m_keyE = false;
+bool m_keyW = false;    // клавиша W
+bool m_keyA = false;    // клавиша A
+bool m_keyS = false;    // клавиша S
+bool m_keyD = false;    // клавиша D
+bool m_keyQ = false;    // клавиша Q (вверх)
+bool m_keyE = false;    // клавиша E (вниз)
 
-// === ПЕРЕМЕННЫЕ ДЛЯ КУБИКА === (???)
+// === ПЕРЕМЕННЫЕ ДЛЯ КУБИКА === 
+// не используется, но оставлено
 ID3D11Buffer* m_pVertexBuffer = nullptr;
 ID3D11Buffer* m_pIndexBuffer = nullptr;
-ID3D11VertexShader* m_pVertexShader = nullptr;
-ID3D11PixelShader* m_pPixelShader = nullptr;
-ID3D11InputLayout* m_pInputLayout = nullptr;
+ID3D11VertexShader* m_pVertexShader = nullptr;       // основной вершинный шейдер для ландшафта
+ID3D11PixelShader* m_pPixelShader = nullptr;         // основной пиксельный шейдер для ландшафта
+ID3D11InputLayout* m_pInputLayout = nullptr;         // описание входных данных для основного шейдера
 
 // === ПЕРЕМЕННЫЕ ДЛЯ ЛАНДШАФТА ===
-ID3D11Buffer* m_pTerrainVertexBuffer = nullptr;
-ID3D11Buffer* m_pTerrainIndexBuffer = nullptr;
-ID3D11Buffer* m_pTerrainGeomBuffer = nullptr;
-UINT m_terrainIndexCount = 0;
-UINT m_terrainGridSizeX = 256;      // кол-во вершин по X
-UINT m_terrainGridSizeZ = 256;      // кол-во вершин по Z
-float m_terrainWidth = 20.0f;       // ширина ландшафта по X
-float m_terrainDepth = 20.0f;       // глубина ландшафта по Z
-float m_terrainHeightScale = 2.0f;  // масштаб высоты
-
+ID3D11Buffer* m_pTerrainVertexBuffer = nullptr;      // вершинный буфер ландшафта
+ID3D11Buffer* m_pTerrainIndexBuffer = nullptr;       // индексный буфер ландшафта
+ID3D11Buffer* m_pTerrainGeomBuffer = nullptr;        // геометрический буфер ландшафта
+UINT m_terrainIndexCount = 0;                         // количество индексов
+UINT m_terrainGridSizeX = 256;                        // кол-во вершин по X
+UINT m_terrainGridSizeZ = 256;                        // кол-во вершин по Z
+float m_terrainWidth = 20.0f;                          // ширина ландшафта по X
+float m_terrainDepth = 20.0f;                          // глубина ландшафта по Z
+float m_terrainHeightScale = 2.0f;                     // масштаб высоты
 
 // === ПЕРЕМЕННЫЕ ДЛЯ МАТРИЦ И УПРАВЛЕНИЯ ===
-ID3D11Buffer* m_pSceneBuffer = nullptr;
+ID3D11Buffer* m_pSceneBuffer = nullptr;               // константный буфер сцены
 
-// === ПЕРЕМЕННЫЕ ДЛЯ БУФЕРА ГЛУБИНЫ (D32_FLOAT) ===
-ID3D11Texture2D* m_pDepthBuffer = nullptr;
-ID3D11DepthStencilView* m_pDepthStencilView = nullptr;
-ID3D11RasterizerState* m_pRasterizerState = nullptr;
+// === ПЕРЕМЕННЫЕ ДЛЯ БУФЕРА ГЛУБИНЫ ===
+ID3D11Texture2D* m_pDepthBuffer = nullptr;            // текстура глубины
+ID3D11DepthStencilView* m_pDepthStencilView = nullptr; // представление глубины/трафарета
+ID3D11RasterizerState* m_pRasterizerState = nullptr;  // состояние растеризатора
 
 // === ПЕРЕМЕННЫЕ ДЛЯ СОСТОЯНИЙ ГЛУБИНЫ ===
-ID3D11DepthStencilState* m_pNormalDepthState = nullptr;     // Для непрозрачных объектов
+ID3D11DepthStencilState* m_pNormalDepthState = nullptr;     // Для непрозрачных объектов (reversed depth)
 
 // === ПЕРЕМЕННЫЕ ДЛЯ BLEND STATES ===
-ID3D11BlendState* m_pOpaqueBlendState = nullptr;    // Для непрозрачных объектов
+ID3D11BlendState* m_pOpaqueBlendState = nullptr;    // Для непрозрачных объектов (без смешивания)
 
 // === ПЕРЕМЕННЫЕ ДЛЯ ТЕКСТУР ===
-ID3D11Texture2D* m_pTexture = nullptr;
-ID3D11ShaderResourceView* m_pTextureView = nullptr;
-ID3D11SamplerState* m_pSampler = nullptr;
+ID3D11Texture2D* m_pTexture = nullptr;                // основная текстура (альбедо)
+ID3D11ShaderResourceView* m_pTextureView = nullptr;   // шейдерное представление основной текстуры
+ID3D11SamplerState* m_pSampler = nullptr;             // сэмплер для текстурирования
 
-UINT m_width = 1280;
-UINT m_height = 720;
+UINT m_width = 1280;                                  // ширина окна
+UINT m_height = 720;                                  // высота окна
 
 // === ПЕРЕМЕННЫЕ ДЛЯ УПРАВЛЕНИЯ КАМЕРОЙ ===
 struct Camera
 {
-    DirectX::XMFLOAT3 poi = { 0.0f, 0.0f, 0.0f };
-    float r = 5.0f;
-    float theta = DirectX::XM_PIDIV4;
-    float phi = -DirectX::XM_PIDIV4;
+    DirectX::XMFLOAT3 poi = { 0.0f, 0.0f, 0.0f };     // точка интереса (центр, вокруг которого вращается камера)
+    float r = 5.0f;                                    // расстояние от камеры до точки интереса
+    float theta = DirectX::XM_PIDIV4;                  // угол возвышения (от -pi/2 до pi/2)
+    float phi = -DirectX::XM_PIDIV4;                    // азимутальный угол
 } m_camera;
 
-bool m_rbPressed = false;
-int m_prevMouseX = 0, m_prevMouseY = 0;
+bool m_rbPressed = false;                              // нажата ли правая кнопка мыши
+int m_prevMouseX = 0, m_prevMouseY = 0;                // предыдущие координаты мыши
 
-static const float CameraRotationSpeed = DirectX::XM_PI * 2.0f;
+static const float CameraRotationSpeed = DirectX::XM_PI * 2.0f; // скорость вращения камеры
 
+// Макрос безопасного освобождения COM-объектов
 #define SAFE_RELEASE(p) { if (p) { (p)->Release(); (p) = nullptr; } }
 
 // === СТРУКТУРА ВЕРШИНЫ С НОРМАЛЯМИ И КАСАТЕЛЬНЫМИ ===
@@ -217,11 +223,12 @@ struct TextureTangentVertex
     float u, v;              // Текстурные координаты
 };
 
+// Инициализация шейдеров (основных для ландшафта)
 bool InitShaders()
 {
     HRESULT result = S_OK;
 
-    // Вершинный шейдер (тот же, что был для куба)
+    // Вершинный шейдер
     const char* vsSource = R"(
     cbuffer GeomBuffer : register(b0)
     {
@@ -371,6 +378,7 @@ bool InitShaders()
     flags |= D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
 #endif
 
+    // Компиляция вершинного шейдера
     result = D3DCompile(vsSource, strlen(vsSource), "VS", nullptr, nullptr, "main", "vs_5_0", flags, 0, &pVSBlob, &pErrorBlob);
     if (FAILED(result))
     {
@@ -378,6 +386,7 @@ bool InitShaders()
         return false;
     }
 
+    // Создание вершинного шейдера
     result = m_pDevice->CreateVertexShader(pVSBlob->GetBufferPointer(), pVSBlob->GetBufferSize(), nullptr, &m_pVertexShader);
     if (FAILED(result))
     {
@@ -385,6 +394,7 @@ bool InitShaders()
         return false;
     }
 
+    // Компиляция пиксельного шейдера
     result = D3DCompile(psSource, strlen(psSource), "PS", nullptr, nullptr, "main", "ps_5_0", flags, 0, &pPSBlob, &pErrorBlob);
     if (FAILED(result))
     {
@@ -393,6 +403,7 @@ bool InitShaders()
         return false;
     }
 
+    // Создание пиксельного шейдера
     result = m_pDevice->CreatePixelShader(pPSBlob->GetBufferPointer(), pPSBlob->GetBufferSize(), nullptr, &m_pPixelShader);
     if (FAILED(result))
     {
@@ -401,6 +412,7 @@ bool InitShaders()
         return false;
     }
 
+    // Описание входных данных вершин (позиция, касательная, нормаль, текстурные координаты)
     static const D3D11_INPUT_ELEMENT_DESC InputDesc[] = {
         { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
         { "TANGENT", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 },
@@ -408,6 +420,7 @@ bool InitShaders()
         { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 36, D3D11_INPUT_PER_VERTEX_DATA, 0 }
     };
 
+    // Создание layout'а для соответствия данным вершин и входу шейдера
     result = m_pDevice->CreateInputLayout(InputDesc, 4,
         pVSBlob->GetBufferPointer(), pVSBlob->GetBufferSize(), &m_pInputLayout);
 
@@ -419,8 +432,10 @@ bool InitShaders()
 }
 
 // === ФУНКЦИЯ СОЗДАНИЯ СФЕРЫ ===
+// Заполняет массивы позиций вершин и индексов для сферы заданной точности (latCells, lonCells)
 void CreateSphere(size_t latCells, size_t lonCells, UINT16* pIndices, DirectX::XMFLOAT3* pPos)
 {
+    // Генерируем вершины сферы (направления из центра)
     for (size_t lat = 0; lat < latCells + 1; lat++)
     {
         for (size_t lon = 0; lon < lonCells + 1; lon++)
@@ -429,6 +444,7 @@ void CreateSphere(size_t latCells, size_t lonCells, UINT16* pIndices, DirectX::X
             float lonAngle = 2.0f * (float)DirectX::XM_PI * lon / lonCells + (float)DirectX::XM_PI;
             float latAngle = -(float)DirectX::XM_PI / 2 + (float)DirectX::XM_PI * lat / latCells;
 
+            // Вычисляем единичный вектор направления
             DirectX::XMFLOAT3 r;
             r.x = sinf(lonAngle) * cosf(latAngle);
             r.y = sinf(latAngle);
@@ -438,6 +454,7 @@ void CreateSphere(size_t latCells, size_t lonCells, UINT16* pIndices, DirectX::X
         }
     }
 
+    // Генерируем индексы для треугольников (два треугольника на ячейку)
     for (size_t lat = 0; lat < latCells; lat++)
     {
         for (size_t lon = 0; lon < lonCells; lon++)
@@ -456,12 +473,13 @@ void CreateSphere(size_t latCells, size_t lonCells, UINT16* pIndices, DirectX::X
 
 // === ФУНКЦИИ ЗАГРУЗКИ ТЕКСТУР И КАРТЫ НОРМАЛЕЙ ИЗ DDS и PNG ===
 
+// Загрузка основной текстуры (альбедо) из PNG
 bool LoadTexture()
 {
     HRESULT result = S_OK;
 
     TextureDesc textureDesc;
-    // Загружаем PNG 
+    // Загружаем PNG  (используем функцию из Texture.cpp)
     if (!LoadPNG(L"landscape/Terrain003_4K_Color.png", textureDesc))   // имя файла
         return false;
 
@@ -474,12 +492,13 @@ bool LoadTexture()
         return false;
     }
 
+    // Описание текстуры 2D
     D3D11_TEXTURE2D_DESC desc = {};
     desc.Format = textureDesc.fmt;                     // DXGI_FORMAT_R8G8B8A8_UNORM
     desc.ArraySize = 1;
-    desc.MipLevels = textureDesc.mipmapsCount;
-    desc.Usage = D3D11_USAGE_IMMUTABLE;
-    desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+    desc.MipLevels = textureDesc.mipmapsCount;          // сколько mip-уровней загружено
+    desc.Usage = D3D11_USAGE_IMMUTABLE;                 // неизменяемая (после загрузки)
+    desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;        // для использования в шейдерах
     desc.CPUAccessFlags = 0;
     desc.MiscFlags = 0;
     desc.SampleDesc.Count = 1;
@@ -495,7 +514,7 @@ bool LoadTexture()
 
     for (UINT i = 0; i < desc.MipLevels; i++)
     {
-        UINT pitch = w * 4;   // 4 байта на пиксель
+        UINT pitch = w * 4;   // 4 байта на пиксель (RGBA)
         UINT levelSize = pitch * h;
 
         data[i].pSysMem = pSrcData;
@@ -507,6 +526,7 @@ bool LoadTexture()
         h = std::max(1u, h / 2);
     }
 
+    // Создание текстуры
     result = m_pDevice->CreateTexture2D(&desc, data.data(), &m_pTexture);
     free(textureDesc.pData);   // освобождаем загруженные данные
     if (FAILED(result))
@@ -526,7 +546,7 @@ bool LoadTexture()
     if (FAILED(result))
         return false;
 
-    // Создание сэмплера (остаётся без изменений)
+    // Создание сэмплера (анизотропная фильтрация)
     D3D11_SAMPLER_DESC samplerDesc = {};
     samplerDesc.Filter = D3D11_FILTER_ANISOTROPIC;
     samplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
@@ -542,6 +562,7 @@ bool LoadTexture()
     return SUCCEEDED(result);
 }
 
+// Загрузка карты нормалей из DDS (сжатый формат BC)
 bool LoadNormalMap()
 {
     HRESULT result = S_OK;
@@ -561,7 +582,7 @@ bool LoadNormalMap()
         return false;
     }
 
-    // Создаем текстуру
+    // Создаем текстуру (аналогично LoadTexture, но для сжатого формата)
     D3D11_TEXTURE2D_DESC desc = {};
     desc.Format = textureDesc.fmt;
     desc.ArraySize = 1;
@@ -575,6 +596,7 @@ bool LoadNormalMap()
     desc.Height = textureDesc.height;
     desc.Width = textureDesc.width;
 
+    // Для сжатых форматов шаг строки вычисляется через блоки 4x4
     UINT32 blockWidth = DivUp(desc.Width, 4u);
     UINT32 blockHeight = DivUp(desc.Height, 4u);
     UINT32 pitch = blockWidth * GetBytesPerBlock(desc.Format);
@@ -611,6 +633,7 @@ bool LoadNormalMap()
     return SUCCEEDED(result);
 }
 
+// Загрузка текстуры деталей (черно-белая карта для наложения микрорельефа)
 bool LoadDetailTexture()
 {
     HRESULT result = S_OK;
@@ -685,12 +708,13 @@ bool LoadDetailTexture()
     return true;
 }
 
+// Инициализация маленьких сфер для визуализации источников света
 bool InitSmallSpheres()
 {
     HRESULT result = S_OK;
 
-    // Параметры сферы (меньше, чем skybox)
-    static const size_t SphereSteps = 8;
+    // Параметры сферы 
+    static const size_t SphereSteps = 8;  // количество сегментов (низкополигональная сфера)
     std::vector<DirectX::XMFLOAT3> sphereVertices;
     std::vector<UINT16> indices;
 
@@ -701,6 +725,7 @@ bool InitSmallSpheres()
     sphereVertices.resize(vertexCount);
     indices.resize(indexCount);
 
+    // Генерируем геометрию сферы
     CreateSphere(SphereSteps, SphereSteps, indices.data(), sphereVertices.data());
 
     // Уменьшаем размер сферы (источники света маленькие)
@@ -711,7 +736,7 @@ bool InitSmallSpheres()
         v.z *= 0.125f;
     }
 
-    // Создаем vertex buffer
+    // Создаем vertex buffer (вершинный буфер)
     D3D11_BUFFER_DESC vbDesc = {};
     vbDesc.ByteWidth = (UINT)(sphereVertices.size() * sizeof(DirectX::XMFLOAT3));
     vbDesc.Usage = D3D11_USAGE_IMMUTABLE;
@@ -728,7 +753,7 @@ bool InitSmallSpheres()
     result = m_pDevice->CreateBuffer(&vbDesc, &vbData, &m_pSmallSphereVertexBuffer);
     if (FAILED(result)) return false;
 
-    // Создаем index buffer
+    // Создаем index buffer (индексный буфер)
     D3D11_BUFFER_DESC ibDesc = {};
     ibDesc.ByteWidth = (UINT)(indices.size() * sizeof(UINT16));
     ibDesc.Usage = D3D11_USAGE_IMMUTABLE;
@@ -745,7 +770,7 @@ bool InitSmallSpheres()
     result = m_pDevice->CreateBuffer(&ibDesc, &ibData, &m_pSmallSphereIndexBuffer);
     if (FAILED(result)) return false;
 
-    // Шейдеры для маленьких сфер
+    // Шейдеры для маленьких сфер (просто закраска цветом)
     const char* smallSphereVSSource = R"(
         cbuffer GeomBuffer : register(b0)
         {
@@ -843,7 +868,7 @@ bool InitSmallSpheres()
         return false;
     }
 
-    // Создаем input layout для маленьких сфер
+    // Создаем input layout для маленьких сфер (только позиция)
     D3D11_INPUT_ELEMENT_DESC smallSphereLayout[] = {
         { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 }
     };
@@ -862,7 +887,7 @@ bool InitSmallSpheres()
     // Создаем константные буферы для каждой маленькой сферы
     D3D11_BUFFER_DESC smallSphereGeomBufferDesc = {};
     smallSphereGeomBufferDesc.ByteWidth = sizeof(SmallSphereGeomBuffer);
-    smallSphereGeomBufferDesc.Usage = D3D11_USAGE_DEFAULT;
+    smallSphereGeomBufferDesc.Usage = D3D11_USAGE_DEFAULT;  // будет обновляться через UpdateSubresource
     smallSphereGeomBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
     smallSphereGeomBufferDesc.CPUAccessFlags = 0;
     smallSphereGeomBufferDesc.MiscFlags = 0;
@@ -892,6 +917,7 @@ bool InitPostProcess()
     HRESULT result = S_OK;
 
     // Шейдеры для постпроцессинга (мульти-эффект)
+    // Вершинный шейдер рисует один треугольник, покрывающий весь экран (используя SV_VertexID)
     const char* postProcessVSSource = R"(
         struct VSInput
         {
@@ -910,7 +936,7 @@ bool InitPostProcess()
             
             float4 pos = float4(0, 0, 0, 0);
             
-            // Один треугольник вместо квадрата
+            // Один треугольник вместо квадрата: три вершины покрывают экран
             switch (vertex.vertexId)
             {
                 case 0:
@@ -1099,10 +1125,10 @@ bool InitPostProcess()
     if (pPostProcessPSBlob) pPostProcessPSBlob->Release();
     if (pErrorBlob) pErrorBlob->Release();
 
-    // Создаем константный буфер для постпроцессинга
+    // Создаем константный буфер для постпроцессинга (динамический, чтобы менять эффект)
     D3D11_BUFFER_DESC postProcessBufferDesc = {};
     postProcessBufferDesc.ByteWidth = sizeof(PostProcessBuffer);
-    postProcessBufferDesc.Usage = D3D11_USAGE_DYNAMIC;
+    postProcessBufferDesc.Usage = D3D11_USAGE_DYNAMIC;   // будет часто обновляться
     postProcessBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
     postProcessBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
     postProcessBufferDesc.MiscFlags = 0;
@@ -1120,6 +1146,7 @@ bool InitPostProcess()
     return SUCCEEDED(result);
 }
 
+// Точка входа в приложение
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
     // Для детерминированной случайности
@@ -1133,12 +1160,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         return -1;
     }
 
+    // Создание окна
     if (!InitWindow(hInstance, nCmdShow))
     {
         MessageBox(NULL, L"Не удалось создать окно!", L"Ошибка", MB_OK);
         return -1;
     }
 
+    // Инициализация DirectX
     if (!InitDirectX())
     {
         MessageBox(NULL, L"Не удалось инициализировать DirectX!", L"Ошибка", MB_OK);
@@ -1146,7 +1175,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         return -1;
     }
 
-    // Инициализируем ImGui
+    // // Инициализация ImGui
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO(); (void)io;
@@ -1155,10 +1184,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     ImGui::StyleColorsDark();
 
-    // Инициализируем ImGui для Win32 и DirectX11
+    // Инициализация ImGui для Win32 и DirectX11
     ImGui_ImplWin32_Init(g_hWnd);
     ImGui_ImplDX11_Init(m_pDevice, m_pDeviceContext);
 
+    // Создание шейдеров
     if (!InitShaders())
     {
         MessageBox(NULL, L"Не удалось создать шейдеры!", L"Ошибка", MB_OK);
@@ -1166,6 +1196,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         return -1;
     }
 
+    // Инициализация ландшафта (генерация вершин, индексов, загрузка карты высот)
     if (!InitTerrain())
     {
         MessageBox(NULL, L"Не удалось инициализировать ландшафт!", L"Ошибка", MB_OK);
@@ -1173,6 +1204,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         return -1;
     }
 
+    // Создание константных буферов
     if (!InitBuffers())
     {
         MessageBox(NULL, L"Не удалось инициализировать буферы!", L"Ошибка", MB_OK);
@@ -1180,7 +1212,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         return -1;
     }
 
-    // Загружаем массив текстур 
+    // Загружаем основную текстуру
     if (!LoadTexture())
     {
         MessageBox(NULL, L"Не удалось загрузить текстуры!", L"Ошибка", MB_OK);
@@ -1224,13 +1256,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     m_lightCount = 1;
     m_lights[0].pos = DirectX::XMFLOAT4(1.0f, 3.0f, 0.0f, 1.0f);
     m_lights[0].color = DirectX::XMFLOAT4(1.0f, 1.0f, 0.0f, 1.0f);
-    m_ambientColor = DirectX::XMFLOAT4(0.3f, 0.3f, 0.4f, 1.0f); // более светлый ambient
+    m_ambientColor = DirectX::XMFLOAT4(0.3f, 0.3f, 0.4f, 1.0f); // светлый ambient
     //m_ambientColor = DirectX::XMFLOAT4(0.0f, 0.0f, 0.2f, 1.0f); //темный эмбиент, чтобы видеть источники
     //m_ambientColor = DirectX::XMFLOAT4(1.0f, 1.0f, 1.1f, 1.0f); //светлый эмбиент
 
     MSG msg = {};
     bool exit = false;
 
+    // Главный цикл сообщений
     while (!exit)
     {
         if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
@@ -1243,6 +1276,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         }
         else
         {
+            // Если нет сообщений, рендерим кадр
             Render();
         }
     }
@@ -1251,12 +1285,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     return (int)msg.wParam;
 }
 
+// Создание окна
 bool InitWindow(HINSTANCE hInstance, int nCmdShow)
 {
     WNDCLASSEX wc = {};
     wc.cbSize = sizeof(WNDCLASSEX);
     wc.style = CS_HREDRAW | CS_VREDRAW;
-    wc.lpfnWndProc = WndProc;
+    wc.lpfnWndProc = WndProc;  // оконная процедура
     wc.hInstance = hInstance;
     wc.hCursor = LoadCursor(NULL, IDC_ARROW);
     wc.lpszClassName = L"DirectX11Window";
@@ -1272,6 +1307,7 @@ bool InitWindow(HINSTANCE hInstance, int nCmdShow)
 
     AdjustWindowRect(&rc, WS_OVERLAPPEDWINDOW, TRUE);
 
+    // Создание окна с заданными размерами
     g_hWnd = CreateWindow(
         L"DirectX11Window",
         L"DirectX 11 - Landscape",
@@ -1291,6 +1327,7 @@ bool InitWindow(HINSTANCE hInstance, int nCmdShow)
     return true;
 }
 
+// Оконная процедура (обработка сообщений)
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     // Передаем сообщения в ImGui
@@ -1304,6 +1341,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         UINT newWidth = LOWORD(lParam);
         UINT newHeight = HIWORD(lParam);
 
+        // Если цепочка обмена существует и размеры валидны, изменяем размер
         if (m_pSwapChain && newWidth > 0 && newHeight > 0)
         {
             ResizeSwapChain(newWidth, newHeight);
@@ -1315,7 +1353,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         m_rbPressed = true;
         m_prevMouseX = GET_X_LPARAM(lParam);  // Используем GET_X_LPARAM
         m_prevMouseY = GET_Y_LPARAM(lParam);  // Используем GET_Y_LPARAM
-        SetCapture(hWnd);
+        SetCapture(hWnd);  // захватываем мышь для получения сообщений даже вне окна
         break;
 
     case WM_RBUTTONUP:
@@ -1329,12 +1367,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             int currentX = GET_X_LPARAM(lParam);  // Используем GET_X_LPARAM
             int currentY = GET_Y_LPARAM(lParam);  // Используем GET_Y_LPARAM
 
+            // Вычисляем изменение углов камеры
             float dx = -(float)(currentX - m_prevMouseX) / m_width * CameraRotationSpeed;
             float dy = (float)(currentY - m_prevMouseY) / m_width * CameraRotationSpeed;
 
             m_camera.phi += dx;
             m_camera.theta += dy;
 
+            // Ограничиваем theta, чтобы камера не переворачивалась
             m_camera.theta = std::min<float>(std::max<float>(m_camera.theta, -(float)DirectX::XM_PIDIV2 + 0.001f), (float)DirectX::XM_PIDIV2 - 0.001f);
 
             m_prevMouseX = currentX;
@@ -1345,7 +1385,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     case WM_MOUSEWHEEL:
     {
         short delta = GET_WHEEL_DELTA_WPARAM(wParam);
-        m_camera.r -= delta / 100.0f;
+        m_camera.r -= delta / 100.0f;  // изменение расстояния
         if (m_camera.r < 1.0f)
             m_camera.r = 1.0f;
     }
@@ -1355,7 +1395,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         switch (wParam)
         {
         case VK_TAB:
-            m_showImGui = !m_showImGui;
+            m_showImGui = !m_showImGui;  // переключение интерфейса по Tab
             break;
         case 'W': m_keyW = true; break;
         case 'A': m_keyA = true; break;
@@ -1391,12 +1431,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     return 0;
 }
 
+// Инициализация Direct3D
 bool InitDirectX()
 {
     HRESULT result = S_OK;
 
+    // Описание цепочки обмена
     DXGI_SWAP_CHAIN_DESC swapChainDesc = {};
-    swapChainDesc.BufferCount = 2;
+    swapChainDesc.BufferCount = 2;  // двойная буферизация
     swapChainDesc.BufferDesc.Width = m_width;
     swapChainDesc.BufferDesc.Height = m_height;
     swapChainDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -1407,15 +1449,16 @@ bool InitDirectX()
     swapChainDesc.SampleDesc.Count = 1;
     swapChainDesc.SampleDesc.Quality = 0;
     swapChainDesc.Windowed = TRUE;
-    swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+    swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;  // современный режим переключения
 
     D3D_FEATURE_LEVEL featureLevels[] = { D3D_FEATURE_LEVEL_11_0 };
 
     UINT createFlags = 0;
 #ifdef _DEBUG
-    createFlags |= D3D11_CREATE_DEVICE_DEBUG;
+    createFlags |= D3D11_CREATE_DEVICE_DEBUG;  // включаем отладочный слой в Debug
 #endif
 
+    // Создаем устройство и цепочку обмена
     result = D3D11CreateDeviceAndSwapChain(
         nullptr,
         D3D_DRIVER_TYPE_HARDWARE,
@@ -1433,6 +1476,7 @@ bool InitDirectX()
 
     if (FAILED(result))
     {
+        // Если не получилось с аппаратным драйвером, пробуем WARP (программный рендерер)
         result = D3D11CreateDeviceAndSwapChain(
             nullptr,
             D3D_DRIVER_TYPE_WARP,
@@ -1452,15 +1496,18 @@ bool InitDirectX()
     if (FAILED(result))
         return false;
 
+    // Настройка заднего буфера (создание RTV и буфера глубины)
     if (!SetupBackBuffer())
         return false;
 
+    // Создание промежуточного буфера цвета для постпроцессинга
     if (!InitColorBuffer())
         return false;
 
+    // Состояние растеризатора (без отсечения задних граней)
     D3D11_RASTERIZER_DESC rasterDesc = {};
     rasterDesc.FillMode = D3D11_FILL_SOLID;
-    rasterDesc.CullMode = D3D11_CULL_NONE;
+    rasterDesc.CullMode = D3D11_CULL_NONE;  // не отсекаем грани
     rasterDesc.FrontCounterClockwise = FALSE;
     rasterDesc.DepthBias = 0;
     rasterDesc.SlopeScaledDepthBias = 0.0f;
@@ -1475,11 +1522,11 @@ bool InitDirectX()
 
     // === СОЗДАНИЕ СОСТОЯНИЙ ГЛУБИНЫ ДЛЯ REVERSED DEPTH ===
 
-    // Для непрозрачных объектов (кубы) - reversed depth
+    // Для непрозрачных объектов - reversed depth
     D3D11_DEPTH_STENCIL_DESC opaqueDepthDesc = {};
     opaqueDepthDesc.DepthEnable = TRUE;
     opaqueDepthDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
-    opaqueDepthDesc.DepthFunc = D3D11_COMPARISON_GREATER;  // REVERSED DEPTH: GREATER
+    opaqueDepthDesc.DepthFunc = D3D11_COMPARISON_GREATER;  // REVERSED DEPTH: ближние объекты имеют большие значения глубины
     opaqueDepthDesc.StencilEnable = FALSE;
 
     result = m_pDevice->CreateDepthStencilState(&opaqueDepthDesc, &m_pNormalDepthState);
@@ -1490,7 +1537,7 @@ bool InitDirectX()
     D3D11_BLEND_DESC blendDesc = {};
     blendDesc.AlphaToCoverageEnable = FALSE;
     blendDesc.IndependentBlendEnable = FALSE;
-    blendDesc.RenderTarget[0].BlendEnable = FALSE;          // отключаем смешивание
+    blendDesc.RenderTarget[0].BlendEnable = FALSE;          // отключаем смешивание (непрозрачные объекты)
     blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
 
     result = m_pDevice->CreateBlendState(&blendDesc, &m_pOpaqueBlendState);
@@ -1499,18 +1546,22 @@ bool InitDirectX()
     return SUCCEEDED(result);
 }
 
+// Настройка заднего буфера и буфера глубины
 bool SetupBackBuffer()
 {
     HRESULT result = S_OK;
 
+    // Освобождаем предыдущие ресурсы 
     SAFE_RELEASE(m_pBackBufferRTV);
     SAFE_RELEASE(m_pDepthStencilView);
     SAFE_RELEASE(m_pDepthBuffer);
 
+    // Получаем задний буфер из цепочки обмена
     ID3D11Texture2D* pBackBuffer = nullptr;
     result = m_pSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&pBackBuffer);
     if (FAILED(result)) return false;
 
+    // Создаем render target view для заднего буфера
     result = m_pDevice->CreateRenderTargetView(pBackBuffer, nullptr, &m_pBackBufferRTV);
     SAFE_RELEASE(pBackBuffer);
     if (FAILED(result)) return false;
@@ -1521,7 +1572,7 @@ bool SetupBackBuffer()
     depthDesc.Height = m_height;
     depthDesc.MipLevels = 1;
     depthDesc.ArraySize = 1;
-    depthDesc.Format = DXGI_FORMAT_D32_FLOAT;
+    depthDesc.Format = DXGI_FORMAT_D32_FLOAT;  // 32-битный float для глубины
     depthDesc.SampleDesc.Count = 1;
     depthDesc.SampleDesc.Quality = 0;
     depthDesc.Usage = D3D11_USAGE_DEFAULT;
@@ -1532,6 +1583,7 @@ bool SetupBackBuffer()
     result = m_pDevice->CreateTexture2D(&depthDesc, nullptr, &m_pDepthBuffer);
     if (FAILED(result)) return false;
 
+    // Создаем depth stencil view
     D3D11_DEPTH_STENCIL_VIEW_DESC depthViewDesc = {};
     depthViewDesc.Format = depthDesc.Format;
     depthViewDesc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
@@ -1543,6 +1595,7 @@ bool SetupBackBuffer()
     return true;
 }
 
+// Инициализация промежуточного буфера цвета для постпроцессинга
 bool InitColorBuffer()
 {
     HRESULT result = S_OK;
@@ -1551,6 +1604,7 @@ bool InitColorBuffer()
     SAFE_RELEASE(m_pColorBufferRTV);
     SAFE_RELEASE(m_pColorBufferSRV);
 
+    // Описание текстуры, которая будет использоваться как рендер-таргет и как шейдерный ресурс
     D3D11_TEXTURE2D_DESC colorBufferDesc = {};
     colorBufferDesc.Width = m_width;
     colorBufferDesc.Height = m_height;
@@ -1574,14 +1628,15 @@ bool InitColorBuffer()
     return SUCCEEDED(result);
 }
 
+// Создание константных буферов (сцены)
 bool InitBuffers()
 {
     HRESULT result = S_OK;
 
-    // Константный буфер сцены
+    // Константный буфер сцены (будет обновляться каждый кадр)
     D3D11_BUFFER_DESC sceneBufferDesc = {};
     sceneBufferDesc.ByteWidth = sizeof(SceneBuffer);
-    sceneBufferDesc.Usage = D3D11_USAGE_DYNAMIC;
+    sceneBufferDesc.Usage = D3D11_USAGE_DYNAMIC;  // будет часто обновляться
     sceneBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
     sceneBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
     sceneBufferDesc.MiscFlags = 0;
@@ -1591,6 +1646,7 @@ bool InitBuffers()
     return SUCCEEDED(result);
 }
 
+// Инициализация ландшафта (загрузка карты высот, создание вершин и индексов)
 bool InitTerrain()
 {
     HRESULT result = S_OK;
@@ -1614,7 +1670,7 @@ bool InitTerrain()
     }
 
     // 2. Определяем размер сетки (уменьшаем шаг для производительности)
-    const int step = 8; // берём каждый 8-й пиксель
+    const int step = 8; // берём каждый 8-й пиксель (уменьшаем количество вершин)
     m_terrainGridSizeX = (width + step - 1) / step;
     m_terrainGridSizeZ = (height + step - 1) / step;
 
@@ -1625,7 +1681,7 @@ bool InitTerrain()
     UINT vertexCount = m_terrainGridSizeX * m_terrainGridSizeZ;
     std::vector<TextureTangentVertex> vertices(vertexCount);
 
-    // Диапазон координат
+    // Диапазон координат ландшафта
     float xMin = -m_terrainWidth / 2.0f;
     float xMax = m_terrainWidth / 2.0f;
     float zMin = -m_terrainDepth / 2.0f;
@@ -1645,7 +1701,7 @@ bool InitTerrain()
             if (mapX >= width) mapX = width - 1;
             if (mapY >= height) mapY = height - 1;
 
-            float heightVal = out_rgba[(mapY * width + mapX) * 4]; // красный канал
+            float heightVal = out_rgba[(mapY * width + mapX) * 4]; // красный канал (высота)
 
             float x = xMin + i * stepX;
             float z = zMin + j * stepZ;
@@ -1658,7 +1714,7 @@ bool InitTerrain()
             vertices[index].u = (float)i / (m_terrainGridSizeX - 1);
             vertices[index].v = (float)j / (m_terrainGridSizeZ - 1);
 
-            // Пока нули, позже вычислим
+            // Пока нули, т.к. вычисляется позже
             vertices[index].nx = vertices[index].ny = vertices[index].nz = 0.0f;
             vertices[index].tx = vertices[index].ty = vertices[index].tz = 0.0f;
         }
@@ -1679,12 +1735,12 @@ bool InitTerrain()
             UINT bottomLeft = (j + 1) * m_terrainGridSizeX + i;
             UINT bottomRight = (j + 1) * m_terrainGridSizeX + i + 1;
 
-            // Первый треугольник
+            // Первый треугольник (левая верхняя половина)
             indices.push_back(topLeft);
             indices.push_back(bottomLeft);
             indices.push_back(topRight);
 
-            // Второй треугольник
+            // Второй треугольник (правая нижняя половина)
             indices.push_back(topRight);
             indices.push_back(bottomLeft);
             indices.push_back(bottomRight);
@@ -1700,6 +1756,7 @@ bool InitTerrain()
         v.tx = v.ty = v.tz = 0.0f;
     }
 
+    // Для каждого треугольника вычисляем нормаль и касательную и накапливаем в вершинах
     for (size_t i = 0; i < indices.size(); i += 3)
     {
         UINT16 i0 = indices[i];
@@ -1728,11 +1785,11 @@ bool InitTerrain()
         XMVECTOR e1 = XMVectorSubtract(p1v, p0v);
         XMVECTOR e2 = XMVectorSubtract(p2v, p0v);
 
-        // Нормаль треугольника
+        // Нормаль треугольника (векторное произведение)
         XMVECTOR normal = XMVector3Cross(e1, e2);
         normal = XMVector3Normalize(normal);
 
-        // Касательная
+        // Касательная (вычисление касательного вектора по формуле с текстурными координатами)
         float deltaU1 = uv1.x - uv0.x;
         float deltaV1 = uv1.y - uv0.y;
         float deltaU2 = uv2.x - uv0.x;
@@ -1759,7 +1816,7 @@ bool InitTerrain()
         XMStoreFloat3((XMFLOAT3*)&v2.tx, XMVectorAdd(XMLoadFloat3((XMFLOAT3*)&v2.tx), tangent));
     }
 
-    // Нормализуем нормали и касательные
+    // Нормализуем нормали и касательные после усреднения
     for (auto& v : vertices)
     {
         DirectX::XMStoreFloat3((DirectX::XMFLOAT3*)&v.nx, DirectX::XMVector3Normalize(DirectX::XMLoadFloat3((DirectX::XMFLOAT3*)&v.nx)));
@@ -1799,10 +1856,10 @@ bool InitTerrain()
     geomBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
 
     GeomBuffer geomData;
-    DirectX::XMMATRIX model = DirectX::XMMatrixIdentity();
+    DirectX::XMMATRIX model = DirectX::XMMatrixIdentity();  // ландшафт в центре
     DirectX::XMStoreFloat4x4(&geomData.m, DirectX::XMMatrixTranspose(model));
-    DirectX::XMStoreFloat4x4(&geomData.normalM, DirectX::XMMatrixIdentity()); // обратная = единичная
-    geomData.shineSpeedTexIdNM = DirectX::XMFLOAT4(0.0f, 0.0f, 0.0f, 1.0f); // shine=0, texId=0
+    DirectX::XMStoreFloat4x4(&geomData.normalM, DirectX::XMMatrixIdentity()); // обратная транспонированная  = единичная
+    geomData.shineSpeedTexIdNM = DirectX::XMFLOAT4(0.0f, 0.0f, 0.0f, 1.0f); // shine=0, texId=0, hasNormalMap=1
     geomData.posAngle = DirectX::XMFLOAT4(0, 0, 0, 0);
 
     D3D11_SUBRESOURCE_DATA geomInitData = { &geomData, 0, 0 };
@@ -1812,16 +1869,17 @@ bool InitTerrain()
     return true;
 }
 
+// Обновление камеры и константного буфера сцены
 void UpdateCamera()
 {
-    // Позиция камеры
+    // Вычисляем позицию камеры в сферических координатах
     DirectX::XMFLOAT3 pos;
     pos.x = m_camera.poi.x + m_camera.r * cosf(m_camera.theta) * cosf(m_camera.phi);
     pos.y = m_camera.poi.y + m_camera.r * sinf(m_camera.theta);
     pos.z = m_camera.poi.z + m_camera.r * cosf(m_camera.theta) * sinf(m_camera.phi);
 
-    // === ИСПРАВЛЕННОЕ ВЫЧИСЛЕНИЕ ВЕКТОРА UP ===
-    // Вектор up должен вращаться вместе с камерой, а не быть фиксированным
+    // === ВЫЧИСЛЕНИЕ ВЕКТОРА UP ===
+    // Вектор up должен вращаться вместе с камерой, а не быть фиксированным (чтобы не было кувыркания)
     float upTheta = m_camera.theta + DirectX::XM_PIDIV2;
     DirectX::XMVECTOR up = DirectX::XMVectorSet(
         cosf(upTheta) * cosf(m_camera.phi),
@@ -1836,13 +1894,14 @@ void UpdateCamera()
     DirectX::XMMATRIX view = DirectX::XMMatrixLookAtLH(eye, at, up);
 
     // === REVERSED DEPTH: матрица проекции с far и near в обратном порядке ===
-    float f = 100.0f;
-    float n = 0.1f;
+    float f = 100.0f;   // дальняя плоскость
+    float n = 0.1f;     // ближняя плоскость
     float fov = (float)DirectX::XM_PI / 3;
     float aspectRatio = (float)m_width / m_height;
 
     // Используем перспективную проекцию с reversed depth
-    float halfW = tanf(fov / 2) * f;
+    // Для reversed depth передаем far как near, near как far
+    float halfW = tanf(fov / 2) * f;   // half-width на дальней плоскости
     float halfH = halfW / aspectRatio;
 
     DirectX::XMMATRIX proj = DirectX::XMMatrixPerspectiveLH(
@@ -1875,7 +1934,7 @@ void UpdateCamera()
     }
     sceneBuffer.ambientColor = m_ambientColor;
 
-    // Обновляем константный буфер
+    // Обновляем константный буфер сцены 
     D3D11_MAPPED_SUBRESOURCE mappedResource;
     HRESULT result = m_pDeviceContext->Map(m_pSceneBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
     if (SUCCEEDED(result))
@@ -1885,6 +1944,7 @@ void UpdateCamera()
     }
 }
 
+// Обновление константного буфера постпроцессинга
 void UpdatePostProcessBuffer()
 {
     if (!m_pPostProcessBuffer) return;
@@ -1911,7 +1971,7 @@ void RenderPostProcess()
     ID3D11RenderTargetView* views[] = { m_pBackBufferRTV };
     m_pDeviceContext->OMSetRenderTargets(1, views, nullptr);
 
-    // Устанавливаем состояния
+    // Устанавливаем состояния по умолчанию
     m_pDeviceContext->OMSetDepthStencilState(nullptr, 0);
     m_pDeviceContext->RSSetState(nullptr);
     m_pDeviceContext->OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
@@ -1920,7 +1980,7 @@ void RenderPostProcess()
     ID3D11SamplerState* samplers[] = { m_pSampler };
     m_pDeviceContext->PSSetSamplers(0, 1, samplers);
 
-    // Устанавливаем текстуру как шейдерный ресурс
+    // Устанавливаем текстуру (промежуточный буфер цвета) как шейдерный ресурс
     ID3D11ShaderResourceView* resources[] = { m_pColorBufferSRV };
     m_pDeviceContext->PSSetShaderResources(0, 1, resources);
 
@@ -1935,10 +1995,11 @@ void RenderPostProcess()
     ID3D11Buffer* postProcessConstantBuffers[] = { m_pPostProcessBuffer };
     m_pDeviceContext->PSSetConstantBuffers(0, 1, postProcessConstantBuffers);
 
-    // Рисуем 3 вершины (один треугольник)
+    // Рисуем 3 вершины (один треугольник, покрывающий экран)
     m_pDeviceContext->Draw(3, 0);
 }
 
+// Изменение размера цепочки обмена при изменении окна
 void ResizeSwapChain(UINT width, UINT height)
 {
     if (width == 0 || height == 0)
@@ -1968,7 +2029,7 @@ void ResizeSwapChain(UINT width, UINT height)
         HRESULT hr = m_pSwapChain->ResizeBuffers(0, m_width, m_height, DXGI_FORMAT_UNKNOWN, 0);
         if (FAILED(hr))
         {
-            // Здесь можно добавить логирование ошибки
+            // Здесь можно добавить логирование ошибки (??)
             return;
         }
     }
@@ -1976,18 +2037,19 @@ void ResizeSwapChain(UINT width, UINT height)
     // Пересоздаём back buffer RTV и depth buffer
     if (!SetupBackBuffer())
     {
-        // Обработка ошибки
+        // Обработка ошибки (??)
         return;
     }
 
     // Пересоздаём color buffer для постпроцессинга
     if (!InitColorBuffer())
     {
-        // Обработка ошибки
+        // Обработка ошибки (??)
         return;
     }
 }
 
+// Рендеринг маленьких сфер (источников света)
 void RenderSmallSpheres()
 {
     if (!m_showLightBulbs || m_lightCount == 0)
@@ -2011,7 +2073,7 @@ void RenderSmallSpheres()
     // Рисуем каждую маленькую сферу (источник света)
     for (int i = 0; i < m_lightCount; i++)
     {
-        // Обновляем матрицу трансформации для этой сферы
+        // Обновляем матрицу трансформации для этой сферы (перенос в позицию источника)
         SmallSphereGeomBuffer geomData;
         DirectX::XMMATRIX model = DirectX::XMMatrixTranslation(
             m_lights[i].pos.x,
@@ -2034,15 +2096,17 @@ void RenderSmallSpheres()
     }
 }
 
+// Основная функция рендеринга (вызывается каждый кадр)
 void Render()
 {
     if (!m_pDeviceContext || !m_pBackBufferRTV)
         return;
 
+    // Сбрасываем шейдерные ресурсы перед началом (на всякий случай)
     ID3D11ShaderResourceView* nullSRVs[3] = { nullptr, nullptr, nullptr };
     m_pDeviceContext->PSSetShaderResources(0, 3, nullSRVs);
 
-    // Рендерим сцену в текстуру для постпроцессинга
+    // Рендерим сцену в промежуточную текстуру для постпроцессинга
     ID3D11RenderTargetView* views[] = { m_pColorBufferRTV };
     m_pDeviceContext->OMSetRenderTargets(1, views, m_pDepthStencilView);
 
@@ -2050,8 +2114,10 @@ void Render()
     static const FLOAT BackColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f }; // чёрный
     m_pDeviceContext->ClearRenderTargetView(m_pColorBufferRTV, BackColor);
     if (m_pDepthStencilView)
+        // Для reversed depth очищаем глубину на 0.0 (дальняя плоскость)
         m_pDeviceContext->ClearDepthStencilView(m_pDepthStencilView, D3D11_CLEAR_DEPTH, 0.0f, 0);
 
+    // Устанавливаем viewport
     D3D11_VIEWPORT viewport = {};
     viewport.TopLeftX = 0;
     viewport.TopLeftY = 0;
@@ -2069,7 +2135,7 @@ void Render()
         float theta = m_camera.theta;
         float phi = m_camera.phi;
 
-        // Направление взгляда от камеры к poi
+        // Направление взгляда от камеры к poi (вектор, указывающий на точку интереса)
         float forwardX = -cosf(theta) * cosf(phi);
         float forwardY = -sinf(theta);
         float forwardZ = -cosf(theta) * sinf(phi);
@@ -2094,7 +2160,7 @@ void Render()
 
         const float speed = 0.1f;
 
-        // Перемещение по горизонтали (WASD)
+        // Перемещение по горизонтали (WASD) - двигаем точку интереса
         if (m_keyW)
         {
             m_camera.poi.x += forwardX * speed;
@@ -2131,6 +2197,7 @@ void Render()
         }
     }
 
+    // Обновление константных буферов (камера и постпроцессинг)
     UpdateCamera();
     UpdatePostProcessBuffer();
 
@@ -2138,7 +2205,7 @@ void Render()
     m_pDeviceContext->OMSetDepthStencilState(m_pNormalDepthState, 0);
     m_pDeviceContext->OMSetBlendState(m_pOpaqueBlendState, nullptr, 0xFFFFFFFF);
 
-    // Устанавливаем текстуры (пока используем старые)
+    // Устанавливаем текстуры: основную, карту нормалей, детали
     ID3D11ShaderResourceView* terrainResources[] = { m_pTextureView, m_pTextureViewNM, m_pDetailTextureView };
     m_pDeviceContext->PSSetShaderResources(0, 3, terrainResources);
 
@@ -2153,10 +2220,11 @@ void Render()
     m_pDeviceContext->VSSetShader(m_pVertexShader, nullptr, 0);
     m_pDeviceContext->PSSetShader(m_pPixelShader, nullptr, 0);
 
+    // Устанавливаем сэмплер
     ID3D11SamplerState* samplers[] = { m_pSampler };
     m_pDeviceContext->PSSetSamplers(0, 1, samplers);
 
-    // Константные буферы
+    // Константные буферы: геометрический (b0) и сцены (b1)
     ID3D11Buffer* constantBuffers[] = { m_pTerrainGeomBuffer, m_pSceneBuffer };
     m_pDeviceContext->VSSetConstantBuffers(0, 2, constantBuffers);
     m_pDeviceContext->PSSetConstantBuffers(0, 2, constantBuffers);
@@ -2167,10 +2235,10 @@ void Render()
     // 2. РЕНДЕРИМ МАЛЕНЬКИЕ СФЕРЫ (ИСТОЧНИКИ СВЕТА)
     RenderSmallSpheres();
 
-    // Применяем постпроцессинг
+    // Применяем постпроцессинг (рисуем на заднем буфере с эффектом)
     RenderPostProcess();
 
-    // 5. РЕНДЕРИМ ImGui
+    // 5. РЕНДЕРИМ ImGui (поверх всего)
     if (m_showImGui)
     {
         // Начало нового кадра ImGui
@@ -2218,7 +2286,6 @@ void Render()
 
         ImGui::End();
 
-
         // Окно постпроцессинга
         ImGui::Begin("Post Processing", &m_showImGui, ImGuiWindowFlags_AlwaysAutoResize);
 
@@ -2245,6 +2312,7 @@ void Render()
 
         ImGui::End();
 
+        // Окно настройки детализации
         ImGui::Begin("Detail Settings", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
         ImGui::SliderFloat("Detail Strength", &m_detailStrength, 0.0f, 2.0f, "%.2f");
         ImGui::End();
@@ -2254,10 +2322,12 @@ void Render()
         ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
     }
 
+    // Вывод на экран с вертикальной синхронизацией (1 - включена)
     HRESULT result = m_pSwapChain->Present(1, 0);
     assert(SUCCEEDED(result));
 }
 
+// Очистка ресурсов
 void Cleanup()
 {
     // Освобождаем ресурсы маленьких сфер
@@ -2275,6 +2345,7 @@ void Cleanup()
     SAFE_RELEASE(m_pTextureViewNM);
     SAFE_RELEASE(m_pTextureNM);
 
+    // Освобождаем ресурсы детализации
     SAFE_RELEASE(m_pDetailTextureView);
 
     // Освобождаем ресурсы постпроцессинга
@@ -2319,7 +2390,7 @@ void Cleanup()
     SAFE_RELEASE(m_pSwapChain);
     SAFE_RELEASE(m_pDeviceContext);
     SAFE_RELEASE(m_pDevice);
-    
+
     // Завершаем COM
     CoUninitialize();
 }
