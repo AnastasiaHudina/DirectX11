@@ -2319,4 +2319,7 @@ void Cleanup()
     SAFE_RELEASE(m_pSwapChain);
     SAFE_RELEASE(m_pDeviceContext);
     SAFE_RELEASE(m_pDevice);
+    
+    // Завершаем COM
+    CoUninitialize();
 }
