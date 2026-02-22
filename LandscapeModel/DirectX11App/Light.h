@@ -5,7 +5,9 @@
 struct Light
 {
     DirectX::XMFLOAT4 pos;
-    DirectX::XMFLOAT4 color;
+    DirectX::XMFLOAT4 color;   // теперь цвет храним в диапазоне 0..1
+    float intensity;           // множитель €ркости
+    float padding[3];          // дл€ выравнивани€ (16 байт)
 };
 
 // ‘ункци€ вычислени€ освещени€ по модели ‘онга
@@ -62,8 +64,9 @@ DirectX::XMFLOAT3 CalculateColor(
         float diffuse = XMVectorGetX(diffuseDot);
         diffuse = (diffuse > 0.0f) ? diffuse : 0.0f;
 
-        // ÷вет источника света
-        XMFLOAT3 lightColor = { lights[i].color.x, lights[i].color.y, lights[i].color.z };
+        // ÷вет источника света с учЄтом интенсивности
+        float intensity = lights[i].intensity;
+        XMFLOAT3 lightColor = { lights[i].color.x * intensity, lights[i].color.y * intensity, lights[i].color.z * intensity };
 
         // ƒобавл€ем диффузную составл€ющую
         finalColor.x += objColor.x * diffuse * atten * lightColor.x;
