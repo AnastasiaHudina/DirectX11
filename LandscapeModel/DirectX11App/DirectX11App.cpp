@@ -67,7 +67,7 @@ struct SceneBuffer
     DirectX::XMFLOAT4 lightInfo;             // x - количество источников, y - использовать карты нормалей, z - показывать нормали, w - сила детали
     Light lights[10];                        // массив источников света (до 10)
     DirectX::XMFLOAT4 ambientColor;          // цвет фонового (ambient) освещения
-
+    DirectX::XMFLOAT4 flowInfo;               // x - использовать Flow 
 };
 
 // Буфер для постпроцессинга
@@ -94,7 +94,9 @@ bool InitBuffers();
 bool LoadTexture();
 bool LoadNormalMap();
 bool LoadDetailTexture();
+bool LoadFlowTexture();
 bool InitSmallSpheres();
+void UpdateLightIntensities();
 void Render();
 void Cleanup();
 void ResizeSwapChain(UINT width, UINT height);
@@ -125,6 +127,10 @@ ID3D11ShaderResourceView* m_pTextureViewNM = nullptr; // шейдерное пр
 
 // === ПЕРЕМЕННЫЕ ДЛЯ ТЕКСТУРЫ ДЕТАЛЕЙ ===
 ID3D11ShaderResourceView* m_pDetailTextureView = nullptr; // шейдерное представление текстуры деталей
+
+// === ПЕРЕМЕННЫЕ ДЛЯ ТЕКСТУРЫ FLOW ===
+ID3D11ShaderResourceView* m_pFlowTextureView = nullptr;
+bool m_flowMode = false;   // false - режим без Flow, true - с Flow
 
 // === ПЕРЕМЕННЫЕ ДЛЯ ПОСТПРОЦЕССИНГА ===
 ID3D11Texture2D* m_pColorBuffer = nullptr;           // текстура для промежуточного рендера (цвет)
@@ -248,6 +254,7 @@ bool InitShaders()
         struct Light { float4 pos; float4 color; float intensity; float3 padding; };
         Light lights[10];
         float4 ambientColor;
+        float4 flowInfo;   // x - использовать Flow
     };
 
     struct VSInput
@@ -287,6 +294,7 @@ bool InitShaders()
     Texture2D colorTexture : register(t0);
     Texture2D normalMapTexture : register(t1);
     Texture2D detailTexture : register(t2);   // текстура деталей
+    Texture2D flowTexture : register(t3);     // текстура потока (flow)
     SamplerState colorSampler : register(s0);
 
     cbuffer SceneBuffer : register(b1)
@@ -297,6 +305,7 @@ bool InitShaders()
         struct Light { float4 pos; float4 color; float intensity; float3 padding; };
         Light lights[10];
         float4 ambientColor;
+        float4 flowInfo;   // x - использовать Flow
     };
 
     struct VSOutput
@@ -367,9 +376,19 @@ bool InitShaders()
             normal = normalize(mul(texNormal, TBN));
         }
         
-        float3 finalColor = CalculateLighting(color, normal, pixel.worldPos, pixel.geomData.x);
-        return float4(finalColor, 1.0);
+            float3 finalColor = CalculateLighting(color, normal, pixel.worldPos, pixel.geomData.x);
+    
+    // Применяем Flow только если включён режим
+    if (flowInfo.x > 0.5)
+    {
+        float3 flowColor = flowTexture.Sample(colorSampler, pixel.uv).rgb;
+        float flowLuminance = dot(flowColor, float3(0.299f, 0.587f, 0.114f));
+        // Ваш вариант 2: затемнение в светлых областях
+        finalColor *= (1.0f - flowLuminance);
     }
+    
+    return float4(finalColor, 1.0);
+}
 )";
 
     ID3DBlob* pVSBlob = nullptr;
@@ -705,6 +724,81 @@ bool LoadDetailTexture()
 
     result = m_pDevice->CreateShaderResourceView(pDetailTexture, &srvDesc, &m_pDetailTextureView);
     pDetailTexture->Release(); // теперь управляет SRV
+    if (FAILED(result))
+        return false;
+
+    return true;
+}
+
+// Загрузка текстуры Flow 
+bool LoadFlowTexture()
+{
+    HRESULT result = S_OK;
+
+    TextureDesc textureDesc;
+    if (!LoadPNG(L"landscape/Terrain003_4K_Flow.png", textureDesc))
+        return false;
+
+    // Проверка поддержки формата
+    UINT formatSupport = 0;
+    if (FAILED(m_pDevice->CheckFormatSupport(textureDesc.fmt, &formatSupport)) ||
+        !(formatSupport & D3D11_FORMAT_SUPPORT_TEXTURE2D))
+    {
+        free(textureDesc.pData);
+        return false;
+    }
+
+    D3D11_TEXTURE2D_DESC desc = {};
+    desc.Format = textureDesc.fmt;                     // DXGI_FORMAT_R8G8B8A8_UNORM
+    desc.ArraySize = 1;
+    desc.MipLevels = textureDesc.mipmapsCount;
+    desc.Usage = D3D11_USAGE_IMMUTABLE;
+    desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+    desc.CPUAccessFlags = 0;
+    desc.MiscFlags = 0;
+    desc.SampleDesc.Count = 1;
+    desc.SampleDesc.Quality = 0;
+    desc.Height = textureDesc.height;
+    desc.Width = textureDesc.width;
+
+    // Подготовка массива субресурсов
+    std::vector<D3D11_SUBRESOURCE_DATA> data(desc.MipLevels);
+    const BYTE* pSrcData = reinterpret_cast<const BYTE*>(textureDesc.pData);
+    UINT w = textureDesc.width;
+    UINT h = textureDesc.height;
+
+    for (UINT i = 0; i < desc.MipLevels; i++)
+    {
+        UINT pitch = w * 4;
+        UINT levelSize = pitch * h;
+
+        data[i].pSysMem = pSrcData;
+        data[i].SysMemPitch = pitch;
+        data[i].SysMemSlicePitch = 0;
+
+        pSrcData += levelSize;
+        w = std::max(1u, w / 2);
+        h = std::max(1u, h / 2);
+    }
+
+    ID3D11Texture2D* pFlowTexture = nullptr;
+    result = m_pDevice->CreateTexture2D(&desc, data.data(), &pFlowTexture);
+    free(textureDesc.pData);
+    if (FAILED(result))
+    {
+        OutputDebugString(L"LoadFlowTexture: Failed to create texture\n");
+        return false;
+    }
+
+    // Создание шейдерного представления
+    D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+    srvDesc.Format = desc.Format;
+    srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+    srvDesc.Texture2D.MipLevels = desc.MipLevels;
+    srvDesc.Texture2D.MostDetailedMip = 0;
+
+    result = m_pDevice->CreateShaderResourceView(pFlowTexture, &srvDesc, &m_pFlowTextureView);
+    pFlowTexture->Release(); // теперь управляет SRV
     if (FAILED(result))
         return false;
 
@@ -1239,6 +1333,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         return -1;
     }
 
+    // Загружаем текстуру Flow
+    if (!LoadFlowTexture())
+    {
+        MessageBox(NULL, L"Не удалось загрузить текстуру Flow!", L"Ошибка", MB_OK);
+        Cleanup();
+        return -1;
+    }
+
     // Инициализация маленьких сфер для визуализации источников
     if (!InitSmallSpheres())
     {
@@ -1260,12 +1362,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     // Основной источник
     m_lights[0].pos = DirectX::XMFLOAT4(-5.0f, 6.9f, -1.0f, 1.0f);
     m_lights[0].color = DirectX::XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f); // белый цвет
-    m_lights[0].intensity = 80.0f; // яркость
     m_lights[0].padding[0] = m_lights[0].padding[1] = m_lights[0].padding[2] = 0.0f;
     // Эмбиент
     //m_ambientColor = DirectX::XMFLOAT4(0.3f, 0.3f, 0.4f, 1.0f); // светлый ambient
     m_ambientColor = DirectX::XMFLOAT4(0.0f, 0.0f, 0.2f, 1.0f); //темный эмбиент, чтобы видеть источники
     //m_ambientColor = DirectX::XMFLOAT4(1.0f, 1.0f, 1.1f, 1.0f); //светлый эмбиент
+    UpdateLightIntensities();  // установит intensity в зависимости от текущего m_flowMode
 
     MSG msg = {};
     bool exit = false;
@@ -1936,6 +2038,7 @@ void UpdateCamera()
         sceneBuffer.lights[i] = m_lights[i];
     }
     sceneBuffer.ambientColor = m_ambientColor;
+    sceneBuffer.flowInfo = DirectX::XMFLOAT4(m_flowMode ? 1.0f : 0.0f, 0.0f, 0.0f, 0.0f);
 
     // Обновляем константный буфер сцены 
     D3D11_MAPPED_SUBRESOURCE mappedResource;
@@ -2099,6 +2202,20 @@ void RenderSmallSpheres()
     }
 }
 
+void UpdateLightIntensities()
+{
+    // Основной источник (индекс 0)
+    if (m_lightCount > 0)
+    {
+        m_lights[0].intensity = m_flowMode ? 100.0f : 80.0f;
+    }
+    // Остальные источники (индексы 1..m_lightCount-1)
+    for (int i = 1; i < m_lightCount; i++)
+    {
+        m_lights[i].intensity = m_flowMode ? 20.0f : 10.0f;
+    }
+}
+
 // Основная функция рендеринга (вызывается каждый кадр)
 void Render()
 {
@@ -2209,8 +2326,8 @@ void Render()
     m_pDeviceContext->OMSetBlendState(m_pOpaqueBlendState, nullptr, 0xFFFFFFFF);
 
     // Устанавливаем текстуры: основную, карту нормалей, детали
-    ID3D11ShaderResourceView* terrainResources[] = { m_pTextureView, m_pTextureViewNM, m_pDetailTextureView };
-    m_pDeviceContext->PSSetShaderResources(0, 3, terrainResources);
+    ID3D11ShaderResourceView* terrainResources[] = { m_pTextureView, m_pTextureViewNM, m_pDetailTextureView, m_pFlowTextureView };
+    m_pDeviceContext->PSSetShaderResources(0, 4, terrainResources);
 
     // Настраиваем пайплайн
     ID3D11Buffer* vertexBuffers[] = { m_pTerrainVertexBuffer };
@@ -2263,8 +2380,8 @@ void Render()
             // Инициализируем новый источник
             m_lights[m_lightCount - 1].pos = DirectX::XMFLOAT4(6.0f, 5.0f, 0.0f, 1.0f);
             m_lights[m_lightCount - 1].color = DirectX::XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-            m_lights[m_lightCount - 1].intensity = 10.0f;
             m_lights[m_lightCount - 1].padding[0] = m_lights[m_lightCount - 1].padding[1] = m_lights[m_lightCount - 1].padding[2] = 0.0f;
+            UpdateLightIntensities(); // пересчитать все интенсивности
         }
         ImGui::SameLine();
         if (ImGui::Button("Delete bulb") && m_lightCount > 0) //Удалить источник
@@ -2320,6 +2437,11 @@ void Render()
         // Окно настройки детализации
         ImGui::Begin("Detail Settings", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
         ImGui::SliderFloat("Detail Strength", &m_detailStrength, 0.0f, 1.5f, "%.2f");
+        ImGui::Checkbox("Flow Mode", &m_flowMode);
+        if (ImGui::IsItemEdited()) // если значение изменилось
+        {
+            UpdateLightIntensities();
+        }
         ImGui::End();
 
         // Рендеринг ImGui
@@ -2352,6 +2474,7 @@ void Cleanup()
 
     // Освобождаем ресурсы детализации
     SAFE_RELEASE(m_pDetailTextureView);
+    SAFE_RELEASE(m_pFlowTextureView);
 
     // Освобождаем ресурсы постпроцессинга
     SAFE_RELEASE(m_pPostProcessBuffer);
@@ -2398,5 +2521,4 @@ void Cleanup()
 
     // Завершаем COM
     CoUninitialize();
-
 }
