@@ -2263,7 +2263,7 @@ void Render()
             // Инициализируем новый источник
             m_lights[m_lightCount - 1].pos = DirectX::XMFLOAT4(6.0f, 5.0f, 0.0f, 1.0f);
             m_lights[m_lightCount - 1].color = DirectX::XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-            m_lights[m_lightCount - 1].intensity = 10.0f; // или 80.0, как вам удобно
+            m_lights[m_lightCount - 1].intensity = 10.0f;
             m_lights[m_lightCount - 1].padding[0] = m_lights[m_lightCount - 1].padding[1] = m_lights[m_lightCount - 1].padding[2] = 0.0f;
         }
         ImGui::SameLine();
@@ -2398,4 +2398,5 @@ void Cleanup()
 
     // Завершаем COM
     CoUninitialize();
+
 }
